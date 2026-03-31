@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
+
 import '../config/theme.dart';
 import '../models/maraude.dart';
 
@@ -10,9 +13,12 @@ class MapScreen extends StatefulWidget {
 }
 
 class _MapScreenState extends State<MapScreen> {
+  static const LatLng _parisCenter = LatLng(48.8566, 2.3522);
+  static const double _ileDeFranceZoom = 9.4;
+
+  final MapController _mapController = MapController();
   DateTime selectedDate = DateTime.now();
 
-  // Sample data - à remplacer par des vraies données
   final List<Maraude> maraudes = [
     Maraude(
       id: '1',
@@ -37,12 +43,18 @@ class _MapScreenState extends State<MapScreen> {
       startTime: '20h30',
       endTime: '21h',
       estimatedPlates: 120,
-      distributionType: 'Distribustion',
+      distributionType: 'Distribution',
       latitude: 48.8530,
       longitude: 2.3610,
       status: MaraudeStatus.planned,
     ),
   ];
+
+  @override
+  void dispose() {
+    _mapController.dispose();
+    super.dispose();
+  }
 
   void _goToNextDay() {
     setState(() {
@@ -62,6 +74,23 @@ class _MapScreenState extends State<MapScreen> {
 
   void _goToAuthenticateScreen() {
     Navigator.pushReplacementNamed(context, '/authenticate');
+  }
+
+  void _recenterMap() {
+    _mapController.move(_parisCenter, _ileDeFranceZoom);
+  }
+
+  Color _markerColorFor(Maraude maraude) {
+    switch (maraude.status) {
+      case MaraudeStatus.completed:
+        return AppTheme.successColor;
+      case MaraudeStatus.ongoing:
+        return AppTheme.dangerColor;
+      case MaraudeStatus.planned:
+        return maraude.estimatedPlates >= 100
+            ? AppTheme.dangerColor
+            : AppTheme.warningColor;
+    }
   }
 
   void _openMaraudeDetail(Maraude maraude) {
@@ -91,15 +120,35 @@ class _MapScreenState extends State<MapScreen> {
               onPressed: () {
                 Navigator.pop(context);
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Prévoir une maraude')),
+                  const SnackBar(content: Text('Prevoir une maraude')),
                 );
               },
-              child: const Text('Prévoir une maraude'),
+              child: const Text('Prevoir une maraude'),
             ),
           ],
         ),
       ),
     );
+  }
+
+  List<Marker> _buildMarkers() {
+    return maraudes
+        .map(
+          (maraude) => Marker(
+            point: LatLng(maraude.latitude, maraude.longitude),
+            width: 48,
+            height: 48,
+            child: GestureDetector(
+              onTap: () => _openMaraudeDetail(maraude),
+              child: Icon(
+                Icons.location_on,
+                size: 42,
+                color: _markerColorFor(maraude),
+              ),
+            ),
+          ),
+        )
+        .toList();
   }
 
   @override
@@ -116,13 +165,12 @@ class _MapScreenState extends State<MapScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.location_on),
-            onPressed: () {},
+            onPressed: _recenterMap,
           ),
         ],
       ),
       body: Column(
         children: [
-          // Calendar Navigation Bar
           Container(
             color: Colors.white,
             padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
@@ -161,100 +209,51 @@ class _MapScreenState extends State<MapScreen> {
               ],
             ),
           ),
-          // Map (placeholder)
           Expanded(
-            child: Container(
-              color: Colors.white,
-              child: Stack(
-                children: [
-                  // Map placeholder
-                  Container(
-                    decoration: BoxDecoration(
-                      color: Colors.grey[200],
-                    ),
-                    child: Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.map,
-                            size: 64,
-                            color: Colors.grey[400],
-                          ),
-                          const SizedBox(height: 16),
-                          Text(
-                            'Carte intégrée\n(Google Maps / Leaflet)',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              color: Colors.grey[600],
-                              fontSize: 14,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+            child: Stack(
+              children: [
+                FlutterMap(
+                  mapController: _mapController,
+                  options: MapOptions(
+                    initialCenter: _parisCenter,
+                    initialZoom: _ileDeFranceZoom,
+                    minZoom: 5,
+                    maxZoom: 18,
                   ),
-                  // Markers (sample)
-                  Positioned(
-                    top: 100,
-                    left: 150,
-                    child: GestureDetector(
-                      onTap: () => _openMaraudeDetail(maraudes[0]),
-                      child: Container(
-                        decoration: const BoxDecoration(
-                          color: AppTheme.dangerColor,
-                          shape: BoxShape.circle,
-                        ),
-                        padding: const EdgeInsets.all(8),
-                        child: const Icon(
-                          Icons.location_on,
-                          color: Colors.white,
-                          size: 20,
-                        ),
-                      ),
+                  children: [
+                    TileLayer(
+                      urlTemplate:
+                          'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                      userAgentPackageName: 'com.example.maraude_map',
+                      maxNativeZoom: 19,
                     ),
-                  ),
-                  Positioned(
-                    top: 200,
-                    right: 80,
-                    child: GestureDetector(
-                      onTap: () => _openMaraudeDetail(maraudes[1]),
-                      child: Container(
-                        decoration: const BoxDecoration(
-                          color: AppTheme.warningColor,
-                          shape: BoxShape.circle,
-                        ),
-                        padding: const EdgeInsets.all(8),
-                        child: const Icon(
-                          Icons.location_on,
-                          color: Colors.white,
-                          size: 20,
-                        ),
-                      ),
+                    MarkerLayer(
+                      markers: _buildMarkers(),
                     ),
-                  ),
-                  // Add maraude button
-                  Positioned(
-                    bottom: 80,
-                    right: 20,
-                    child: FloatingActionButton.extended(
-                      onPressed: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Ajouter une maraude'),
-                          ),
-                        );
-                      },
-                      icon: const Icon(Icons.add),
-                      label: const Text('Ajouter une maraude'),
-                      backgroundColor: AppTheme.primaryColor,
+                    const SimpleAttributionWidget(
+                      source: Text('OpenStreetMap contributors'),
                     ),
+                  ],
+                ),
+                Positioned(
+                  bottom: 20,
+                  right: 20,
+                  child: FloatingActionButton.extended(
+                    onPressed: () {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Ajouter une maraude'),
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.add),
+                    label: const Text('Ajouter une maraude'),
+                    backgroundColor: AppTheme.primaryColor,
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
-          // Bottom Navigation Bar
           Container(
             decoration: BoxDecoration(
               color: Colors.white,
