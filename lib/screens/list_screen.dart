@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+
 import '../config/theme.dart';
 import '../models/maraude.dart';
+import '../widgets/date_selector_bar.dart';
 
 class ListScreen extends StatefulWidget {
   const ListScreen({super.key});
@@ -10,12 +12,35 @@ class ListScreen extends StatefulWidget {
 }
 
 class _ListScreenState extends State<ListScreen> {
-  String selectedFilterDate = 'Tous';
   String selectedFilterAssociation = 'Tous';
   String selectedFilterAddress = 'Tous';
+  DateTime selectedDate = DateTime.now();
+  bool isFilterBarVisible = false;
 
   void _goToAuthenticateScreen() {
     Navigator.pushReplacementNamed(context, '/authenticate');
+  }
+
+  void _goToMapScreen() {
+    Navigator.pushReplacementNamed(context, '/home');
+  }
+
+  void _goToNextDay() {
+    setState(() {
+      selectedDate = selectedDate.add(const Duration(days: 1));
+    });
+  }
+
+  void _goToPreviousDay() {
+    setState(() {
+      selectedDate = selectedDate.subtract(const Duration(days: 1));
+    });
+  }
+
+  void _toggleFilterBar() {
+    setState(() {
+      isFilterBarVisible = !isFilterBarVisible;
+    });
   }
 
   final List<Maraude> maraudes = [
@@ -93,8 +118,7 @@ class _ListScreenState extends State<ListScreen> {
 
   List<Maraude> getFilteredMaraudes() {
     return maraudes.where((maraude) {
-      bool matchDate = selectedFilterDate == 'Tous' ||
-          maraude.date.day.toString() == selectedFilterDate;
+      final matchDate = DateUtils.isSameDay(maraude.date, selectedDate);
       bool matchAssoc = selectedFilterAssociation == 'Tous' ||
           maraude.associationName.contains(selectedFilterAssociation);
       bool matchAddress = selectedFilterAddress == 'Tous' ||
@@ -119,7 +143,11 @@ class _ListScreenState extends State<ListScreen> {
         centerTitle: true,
         actions: [
           IconButton(
-            icon: const Icon(Icons.location_on),
+            icon: Image.asset(
+              'assets/images/logo_sans_texte.png',
+              width: 28,
+              height: 28,
+            ),
             onPressed: () {
               Navigator.pushReplacementNamed(context, '/home');
             },
@@ -128,77 +156,11 @@ class _ListScreenState extends State<ListScreen> {
       ),
       body: Column(
         children: [
-          // Filters
-          Container(
-            color: Colors.white,
-            padding: const EdgeInsets.all(12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Filtrer par :',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    children: [
-                      _buildFilterChip(
-                        'Date',
-                        selectedFilterDate,
-                        ['Tous', 'Aujourd\'hui', 'Demain'],
-                        (value) {
-                          setState(() {
-                            selectedFilterDate = value;
-                          });
-                        },
-                      ),
-                      const SizedBox(width: 8),
-                      _buildFilterChip(
-                        'Association',
-                        selectedFilterAssociation,
-                        [
-                          'Tous',
-                          'TAYBA',
-                          'EILMY',
-                          'egdrieh',
-                          'dherherh',
-                          'ehseh'
-                        ],
-                        (value) {
-                          setState(() {
-                            selectedFilterAssociation = value;
-                          });
-                        },
-                      ),
-                      const SizedBox(width: 8),
-                      _buildFilterChip(
-                        'Adresse',
-                        selectedFilterAddress,
-                        [
-                          'Tous',
-                          'Stallingrad',
-                          'Pont-Marie',
-                          'Bastille',
-                          'Foyer Ivry'
-                        ],
-                        (value) {
-                          setState(() {
-                            selectedFilterAddress = value;
-                          });
-                        },
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
+          DateSelectorBar(
+            selectedDate: selectedDate,
+            onLeftPressed: _goToPreviousDay,
+            onRightPressed: _goToNextDay,
           ),
-          // List of Maraudes
           Expanded(
             child: ListView.builder(
               padding: const EdgeInsets.all(12),
@@ -207,6 +169,132 @@ class _ListScreenState extends State<ListScreen> {
                 final maraude = filteredMaraudes[index];
                 return _buildMaraudeCard(maraude);
               },
+            ),
+          ),
+          AnimatedSize(
+            duration: const Duration(milliseconds: 180),
+            curve: Curves.easeInOut,
+            child: isFilterBarVisible
+                ? Container(
+                    width: double.infinity,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      border: Border(
+                        top: BorderSide(color: Colors.grey[300]!),
+                      ),
+                    ),
+                    padding: const EdgeInsets.all(12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Text(
+                          'Filtrer par :',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _buildFilterChip(
+                                'Association',
+                                selectedFilterAssociation,
+                                [
+                                  'Tous',
+                                  'TAYBA',
+                                  'EILMY',
+                                  'egdrieh',
+                                  'dherherh',
+                                  'ehseh'
+                                ],
+                                (value) {
+                                  setState(() {
+                                    selectedFilterAssociation = value;
+                                  });
+                                },
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: _buildFilterChip(
+                                'Adresse',
+                                selectedFilterAddress,
+                                [
+                                  'Tous',
+                                  'Stallingrad',
+                                  'Pont-Marie',
+                                  'Bastille',
+                                  'Foyer Ivry'
+                                ],
+                                (value) {
+                                  setState(() {
+                                    selectedFilterAddress = value;
+                                  });
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  )
+                : const SizedBox.shrink(),
+          ),
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              border: Border(
+                top: BorderSide(color: Colors.grey[300]!),
+              ),
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                GestureDetector(
+                  onTap: _toggleFilterBar,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.tune,
+                        color: AppTheme.primaryColor,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Filtre',
+                        style: TextStyle(
+                          color: AppTheme.primaryColor,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                GestureDetector(
+                  onTap: _goToMapScreen,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: const [
+                      Icon(
+                        Icons.location_on,
+                        color: AppTheme.primaryColor,
+                      ),
+                      SizedBox(height: 4),
+                      Text(
+                        'Carte',
+                        style: TextStyle(
+                          color: AppTheme.primaryColor,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
           ),
         ],
@@ -231,21 +319,26 @@ class _ListScreenState extends State<ListScreen> {
         }).toList();
       },
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
           border: Border.all(color: AppTheme.primaryColor),
           borderRadius: BorderRadius.circular(20),
         ),
         child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(
-              label,
-              style: const TextStyle(
-                color: AppTheme.primaryColor,
-                fontSize: 12,
+            Flexible(
+              child: Text(
+                label,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: AppTheme.primaryColor,
+                  fontSize: 12,
+                ),
               ),
             ),
-            const SizedBox(width: 4),
+            const SizedBox(width: 8),
             const Icon(
               Icons.arrow_drop_down,
               color: AppTheme.primaryColor,
@@ -289,38 +382,43 @@ class _ListScreenState extends State<ListScreen> {
               ],
             ),
             const SizedBox(height: 8),
-            Text(
-              maraude.location,
-              style: const TextStyle(
-                color: AppTheme.dangerColor,
-                fontSize: 13,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              maraude.address,
-              style: const TextStyle(
-                fontSize: 12,
-                color: AppTheme.textSecondaryColor,
-              ),
-            ),
-            const SizedBox(height: 12),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                Text(
-                  '${maraude.estimatedPlates} Plats',
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 13,
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        maraude.location,
+                        style: const TextStyle(
+                          color: AppTheme.dangerColor,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        maraude.address,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: AppTheme.textSecondaryColor,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                Text(
-                  maraude.distributionType,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: AppTheme.textSecondaryColor,
+                const SizedBox(width: 12),
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 2),
+                  child: Text(
+                    '${maraude.estimatedPlates} Plats',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                    ),
                   ),
                 ),
               ],

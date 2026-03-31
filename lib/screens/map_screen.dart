@@ -4,6 +4,7 @@ import 'package:latlong2/latlong.dart';
 
 import '../config/theme.dart';
 import '../models/maraude.dart';
+import '../widgets/date_selector_bar.dart';
 
 class MapScreen extends StatefulWidget {
   const MapScreen({super.key});
@@ -15,9 +16,13 @@ class MapScreen extends StatefulWidget {
 class _MapScreenState extends State<MapScreen> {
   static const LatLng _parisCenter = LatLng(48.8566, 2.3522);
   static const double _ileDeFranceZoom = 9.4;
+  static const double _minMapZoom = 5;
+  static const double _maxMapZoom = 18;
 
   final MapController _mapController = MapController();
   DateTime selectedDate = DateTime.now();
+  String selectedFilterAssociation = 'Tous';
+  bool isAssociationFilterVisible = false;
 
   final List<Maraude> maraudes = [
     Maraude(
@@ -76,8 +81,26 @@ class _MapScreenState extends State<MapScreen> {
     Navigator.pushReplacementNamed(context, '/authenticate');
   }
 
+  void _toggleAssociationFilterBar() {
+    setState(() {
+      isAssociationFilterVisible = !isAssociationFilterVisible;
+    });
+  }
+
   void _recenterMap() {
     _mapController.move(_parisCenter, _ileDeFranceZoom);
+  }
+
+  void _zoomIn() {
+    final camera = _mapController.camera;
+    final zoom = (camera.zoom + 1).clamp(_minMapZoom, _maxMapZoom).toDouble();
+    _mapController.move(camera.center, zoom);
+  }
+
+  void _zoomOut() {
+    final camera = _mapController.camera;
+    final zoom = (camera.zoom - 1).clamp(_minMapZoom, _maxMapZoom).toDouble();
+    _mapController.move(camera.center, zoom);
   }
 
   Color _markerColorFor(Maraude maraude) {
@@ -91,6 +114,16 @@ class _MapScreenState extends State<MapScreen> {
             ? AppTheme.dangerColor
             : AppTheme.warningColor;
     }
+  }
+
+  List<String> _associationOptions() {
+    final options = <String>['Tous'];
+    for (final maraude in maraudes) {
+      if (!options.contains(maraude.associationName)) {
+        options.add(maraude.associationName);
+      }
+    }
+    return options;
   }
 
   void _openMaraudeDetail(Maraude maraude) {
@@ -133,6 +166,11 @@ class _MapScreenState extends State<MapScreen> {
 
   List<Marker> _buildMarkers() {
     return maraudes
+        .where(
+          (maraude) =>
+              selectedFilterAssociation == 'Tous' ||
+              maraude.associationName == selectedFilterAssociation,
+        )
         .map(
           (maraude) => Marker(
             point: LatLng(maraude.latitude, maraude.longitude),
@@ -151,6 +189,146 @@ class _MapScreenState extends State<MapScreen> {
         .toList();
   }
 
+  Widget _buildMapControlButton({
+    required IconData icon,
+    required VoidCallback onPressed,
+    BorderRadius? borderRadius,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onPressed,
+        borderRadius: borderRadius,
+        child: SizedBox(
+          width: 48,
+          height: 48,
+          child: Icon(
+            icon,
+            size: 24,
+            color: AppTheme.textPrimaryColor,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMapControls() {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.black12),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x22000000),
+            blurRadius: 12,
+            offset: Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _buildMapControlButton(
+            icon: Icons.add,
+            onPressed: _zoomIn,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+          ),
+          Divider(height: 1, color: Colors.grey[300]),
+          _buildMapControlButton(
+            icon: Icons.remove,
+            onPressed: _zoomOut,
+          ),
+          Divider(height: 1, color: Colors.grey[300]),
+          _buildMapControlButton(
+            icon: Icons.gps_fixed,
+            onPressed: _recenterMap,
+            borderRadius:
+                const BorderRadius.vertical(bottom: Radius.circular(16)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAssociationFilterChip() {
+    final label = selectedFilterAssociation == 'Tous'
+        ? 'Association'
+        : 'Association : $selectedFilterAssociation';
+
+    return PopupMenuButton<String>(
+      onSelected: (value) {
+        setState(() {
+          selectedFilterAssociation = value;
+        });
+      },
+      itemBuilder: (BuildContext context) {
+        return _associationOptions().map<PopupMenuItem<String>>((String value) {
+          return PopupMenuItem<String>(
+            value: value,
+            child: Text(value),
+          );
+        }).toList();
+      },
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          border: Border.all(color: AppTheme.primaryColor),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Flexible(
+              child: Text(
+                label,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: AppTheme.primaryColor,
+                  fontSize: 12,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            const Icon(
+              Icons.arrow_drop_down,
+              color: AppTheme.primaryColor,
+              size: 18,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAssociationFilterBar() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border(
+          top: BorderSide(color: Colors.grey[300]!),
+        ),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      child: Row(
+        children: [
+          const Text(
+            'Filtrer par :',
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 14,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: _buildAssociationFilterChip(),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -164,50 +342,21 @@ class _MapScreenState extends State<MapScreen> {
         centerTitle: true,
         actions: [
           IconButton(
-            icon: const Icon(Icons.location_on),
+            icon: Image.asset(
+              'assets/images/logo_sans_texte.png',
+              width: 28,
+              height: 28,
+            ),
             onPressed: _recenterMap,
           ),
         ],
       ),
       body: Column(
         children: [
-          Container(
-            color: Colors.white,
-            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                IconButton(
-                  icon: const Icon(Icons.chevron_left),
-                  onPressed: _goToPreviousDay,
-                ),
-                Column(
-                  children: [
-                    Text(
-                      'Aujourd\'hui',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: selectedDate.day == DateTime.now().day
-                            ? AppTheme.primaryColor
-                            : Colors.grey,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '${selectedDate.day}/${selectedDate.month}',
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey,
-                      ),
-                    ),
-                  ],
-                ),
-                IconButton(
-                  icon: const Icon(Icons.chevron_right),
-                  onPressed: _goToNextDay,
-                ),
-              ],
-            ),
+          DateSelectorBar(
+            selectedDate: selectedDate,
+            onLeftPressed: _goToPreviousDay,
+            onRightPressed: _goToNextDay,
           ),
           Expanded(
             child: Stack(
@@ -217,8 +366,8 @@ class _MapScreenState extends State<MapScreen> {
                   options: MapOptions(
                     initialCenter: _parisCenter,
                     initialZoom: _ileDeFranceZoom,
-                    minZoom: 5,
-                    maxZoom: 18,
+                    minZoom: _minMapZoom,
+                    maxZoom: _maxMapZoom,
                   ),
                   children: [
                     TileLayer(
@@ -236,23 +385,65 @@ class _MapScreenState extends State<MapScreen> {
                   ],
                 ),
                 Positioned(
-                  bottom: 20,
-                  right: 20,
-                  child: FloatingActionButton.extended(
-                    onPressed: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Ajouter une maraude'),
+                  top: 16,
+                  left: 16,
+                  child: _buildMapControls(),
+                ),
+                Positioned(
+                  left: 24,
+                  right: 24,
+                  bottom: 64,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(36),
+                      boxShadow: const [
+                        BoxShadow(
+                          color: Color(0x33000000),
+                          blurRadius: 24,
+                          offset: Offset(0, 12),
                         ),
-                      );
-                    },
-                    icon: const Icon(Icons.add),
-                    label: const Text('Ajouter une maraude'),
-                    backgroundColor: AppTheme.primaryColor,
+                      ],
+                    ),
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Ajouter une maraude'),
+                          ),
+                        );
+                      },
+                      icon: const Icon(Icons.add_rounded, size: 28),
+                      label: const Text('Ajouter une maraude'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF3558D4),
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        minimumSize: const Size.fromHeight(72),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 28,
+                          vertical: 18,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(36),
+                        ),
+                        textStyle: const TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 0.2,
+                        ),
+                      ),
+                    ),
                   ),
                 ),
               ],
             ),
+          ),
+          AnimatedSize(
+            duration: const Duration(milliseconds: 180),
+            curve: Curves.easeInOut,
+            child: isAssociationFilterVisible
+                ? _buildAssociationFilterBar()
+                : const SizedBox.shrink(),
           ),
           Container(
             decoration: BoxDecoration(
@@ -265,22 +456,25 @@ class _MapScreenState extends State<MapScreen> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
-                Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.tune,
-                      color: AppTheme.primaryColor,
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Filtre',
-                      style: TextStyle(
+                GestureDetector(
+                  onTap: _toggleAssociationFilterBar,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.tune,
                         color: AppTheme.primaryColor,
-                        fontSize: 12,
                       ),
-                    ),
-                  ],
+                      const SizedBox(height: 4),
+                      Text(
+                        'Filtre',
+                        style: TextStyle(
+                          color: AppTheme.primaryColor,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
                 GestureDetector(
                   onTap: _goToListScreen,
@@ -289,13 +483,13 @@ class _MapScreenState extends State<MapScreen> {
                     children: const [
                       Icon(
                         Icons.list,
-                        color: Colors.grey,
+                        color: AppTheme.primaryColor,
                       ),
                       SizedBox(height: 4),
                       Text(
                         'Liste',
                         style: TextStyle(
-                          color: Colors.grey,
+                          color: AppTheme.primaryColor,
                           fontSize: 12,
                         ),
                       ),
