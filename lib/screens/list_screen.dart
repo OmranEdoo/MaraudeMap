@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../config/theme.dart';
 import '../models/maraude.dart';
+import '../widgets/bottom_bar_action.dart';
 import '../widgets/date_selector_bar.dart';
 
 class ListScreen extends StatefulWidget {
@@ -144,7 +145,7 @@ class _ListScreenState extends State<ListScreen> {
         actions: [
           IconButton(
             icon: Image.asset(
-              'assets/images/logo_sans_texte.png',
+              'assets/images/logo_claire_sans_texte.png',
               width: 28,
               height: 28,
             ),
@@ -252,46 +253,20 @@ class _ListScreenState extends State<ListScreen> {
             ),
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
-                GestureDetector(
-                  onTap: _toggleFilterBar,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.tune,
-                        color: AppTheme.primaryColor,
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Filtre',
-                        style: TextStyle(
-                          color: AppTheme.primaryColor,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
+                Expanded(
+                  child: BottomBarAction(
+                    icon: Icons.tune,
+                    label: 'Filtre',
+                    onTap: _toggleFilterBar,
                   ),
                 ),
-                GestureDetector(
-                  onTap: _goToMapScreen,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: const [
-                      Icon(
-                        Icons.location_on,
-                        color: AppTheme.primaryColor,
-                      ),
-                      SizedBox(height: 4),
-                      Text(
-                        'Carte',
-                        style: TextStyle(
-                          color: AppTheme.primaryColor,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
+                const SizedBox(width: 12),
+                Expanded(
+                  child: BottomBarAction(
+                    icon: Icons.location_on,
+                    label: 'Carte',
+                    onTap: _goToMapScreen,
                   ),
                 ),
               ],

@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 
 class AppTheme {
-  static const Color primaryColor = Color(0xFF1F5BA8); // Bleu principal
-  static const Color accentColor = Color(0xFF1F5BA8);
+  static const Color primaryColor = Color(0xFF3C84FD); // Bleu du logo
+  static const Color accentColor = Color(0xFF3C84FD);
   static const Color successColor = Color(0xFF4CAF50); // Vert
   static const Color warningColor = Color(0xFFFFA500); // Orange
   static const Color dangerColor = Color(0xFFE74C3C); // Rouge

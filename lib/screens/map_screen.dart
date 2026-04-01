@@ -4,6 +4,8 @@ import 'package:latlong2/latlong.dart';
 
 import '../config/theme.dart';
 import '../models/maraude.dart';
+import '../screens/create_maraude_screen.dart';
+import '../widgets/bottom_bar_action.dart';
 import '../widgets/date_selector_bar.dart';
 
 class MapScreen extends StatefulWidget {
@@ -15,7 +17,7 @@ class MapScreen extends StatefulWidget {
 
 class _MapScreenState extends State<MapScreen> {
   static const LatLng _parisCenter = LatLng(48.8566, 2.3522);
-  static const double _ileDeFranceZoom = 9.4;
+  static const double _ileDeFranceZoom = 10.4;
   static const double _minMapZoom = 5;
   static const double _maxMapZoom = 18;
 
@@ -79,6 +81,31 @@ class _MapScreenState extends State<MapScreen> {
 
   void _goToAuthenticateScreen() {
     Navigator.pushReplacementNamed(context, '/authenticate');
+  }
+
+  Future<void> _openCreateMaraudeScreen() async {
+    final availableAssociations = _associationOptions()
+        .where((association) => association != 'Tous')
+        .toList();
+    final initialAssociation = selectedFilterAssociation != 'Tous'
+        ? selectedFilterAssociation
+        : (availableAssociations.isNotEmpty ? availableAssociations.first : 'TAYBA');
+
+    final isSaved = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (context) => CreateMaraudeScreen(
+          initialAssociation: initialAssociation,
+        ),
+      ),
+    );
+
+    if (isSaved == true && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Maraude enregistree.'),
+        ),
+      );
+    }
   }
 
   void _toggleAssociationFilterBar() {
@@ -343,7 +370,7 @@ class _MapScreenState extends State<MapScreen> {
         actions: [
           IconButton(
             icon: Image.asset(
-              'assets/images/logo_sans_texte.png',
+              'assets/images/logo_claire_sans_texte.png',
               width: 28,
               height: 28,
             ),
@@ -368,6 +395,11 @@ class _MapScreenState extends State<MapScreen> {
                     initialZoom: _ileDeFranceZoom,
                     minZoom: _minMapZoom,
                     maxZoom: _maxMapZoom,
+                    interactionOptions: InteractionOptions(
+                      flags: InteractiveFlag.all & ~InteractiveFlag.rotate,
+                      cursorKeyboardRotationOptions:
+                          CursorKeyboardRotationOptions.disabled(),
+                    ),
                   ),
                   children: [
                     TileLayer(
@@ -405,17 +437,11 @@ class _MapScreenState extends State<MapScreen> {
                       ],
                     ),
                     child: ElevatedButton.icon(
-                      onPressed: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Ajouter une maraude'),
-                          ),
-                        );
-                      },
+                      onPressed: _openCreateMaraudeScreen,
                       icon: const Icon(Icons.add_rounded, size: 28),
                       label: const Text('Ajouter une maraude'),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF3558D4),
+                        backgroundColor: AppTheme.primaryColor,
                         foregroundColor: Colors.white,
                         elevation: 0,
                         minimumSize: const Size.fromHeight(72),
@@ -454,46 +480,20 @@ class _MapScreenState extends State<MapScreen> {
             ),
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
-                GestureDetector(
-                  onTap: _toggleAssociationFilterBar,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.tune,
-                        color: AppTheme.primaryColor,
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Filtre',
-                        style: TextStyle(
-                          color: AppTheme.primaryColor,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
+                Expanded(
+                  child: BottomBarAction(
+                    icon: Icons.tune,
+                    label: 'Filtre',
+                    onTap: _toggleAssociationFilterBar,
                   ),
                 ),
-                GestureDetector(
-                  onTap: _goToListScreen,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: const [
-                      Icon(
-                        Icons.list,
-                        color: AppTheme.primaryColor,
-                      ),
-                      SizedBox(height: 4),
-                      Text(
-                        'Liste',
-                        style: TextStyle(
-                          color: AppTheme.primaryColor,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
+                const SizedBox(width: 12),
+                Expanded(
+                  child: BottomBarAction(
+                    icon: Icons.list,
+                    label: 'Liste',
+                    onTap: _goToListScreen,
                   ),
                 ),
               ],
