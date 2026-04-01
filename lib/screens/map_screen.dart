@@ -5,8 +5,11 @@ import 'package:latlong2/latlong.dart';
 import '../config/theme.dart';
 import '../models/maraude.dart';
 import '../screens/create_maraude_screen.dart';
+import '../screens/edit_maraude_screen.dart';
 import '../widgets/bottom_bar_action.dart';
 import '../widgets/date_selector_bar.dart';
+import '../widgets/header_logo.dart';
+import '../widgets/navigation_menu_panel.dart';
 
 class MapScreen extends StatefulWidget {
   const MapScreen({super.key});
@@ -26,7 +29,7 @@ class _MapScreenState extends State<MapScreen> {
   String selectedFilterAssociation = 'Tous';
   bool isAssociationFilterVisible = false;
 
-  final List<Maraude> maraudes = [
+  List<Maraude> maraudes = [
     Maraude(
       id: '1',
       associationName: 'TAYBA',
@@ -53,7 +56,7 @@ class _MapScreenState extends State<MapScreen> {
       distributionType: 'Distribution',
       latitude: 48.8530,
       longitude: 2.3610,
-      status: MaraudeStatus.planned,
+      status: MaraudeStatus.completed,
     ),
   ];
 
@@ -79,10 +82,6 @@ class _MapScreenState extends State<MapScreen> {
     Navigator.pushReplacementNamed(context, '/list');
   }
 
-  void _goToAuthenticateScreen() {
-    Navigator.pushReplacementNamed(context, '/authenticate');
-  }
-
   Future<void> _openCreateMaraudeScreen() async {
     final availableAssociations = _associationOptions()
         .where((association) => association != 'Tous')
@@ -95,6 +94,7 @@ class _MapScreenState extends State<MapScreen> {
       MaterialPageRoute(
         builder: (context) => CreateMaraudeScreen(
           initialAssociation: initialAssociation,
+          initialDate: selectedDate,
         ),
       ),
     );
@@ -106,6 +106,31 @@ class _MapScreenState extends State<MapScreen> {
         ),
       );
     }
+  }
+
+  Future<void> _openEditMaraudeScreen(Maraude maraude) async {
+    final updatedMaraude = await Navigator.of(context).push<Maraude>(
+      MaterialPageRoute(
+        builder: (context) => EditMaraudeScreen(maraude: maraude),
+      ),
+    );
+
+    if (updatedMaraude == null || !mounted) {
+      return;
+    }
+
+    setState(() {
+      final index = maraudes.indexWhere((item) => item.id == updatedMaraude.id);
+      if (index != -1) {
+        maraudes[index] = updatedMaraude;
+      }
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Maraude modifiee.'),
+      ),
+    );
   }
 
   void _toggleAssociationFilterBar() {
@@ -128,6 +153,12 @@ class _MapScreenState extends State<MapScreen> {
     final camera = _mapController.camera;
     final zoom = (camera.zoom - 1).clamp(_minMapZoom, _maxMapZoom).toDouble();
     _mapController.move(camera.center, zoom);
+  }
+
+  bool _canCreateMaraudeForSelectedDate() {
+    final today = DateUtils.dateOnly(DateTime.now());
+    final selectedDay = DateUtils.dateOnly(selectedDate);
+    return !selectedDay.isBefore(today);
   }
 
   Color _markerColorFor(Maraude maraude) {
@@ -156,7 +187,7 @@ class _MapScreenState extends State<MapScreen> {
   void _openMaraudeDetail(Maraude maraude) {
     showModalBottomSheet(
       context: context,
-      builder: (context) => Container(
+      builder: (sheetContext) => Container(
         padding: const EdgeInsets.all(20),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -178,12 +209,10 @@ class _MapScreenState extends State<MapScreen> {
             const SizedBox(height: 20),
             ElevatedButton(
               onPressed: () {
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Prevoir une maraude')),
-                );
+                Navigator.pop(sheetContext);
+                _openEditMaraudeScreen(maraude);
               },
-              child: const Text('Prevoir une maraude'),
+              child: const Text('Modifier la maraude'),
             ),
           ],
         ),
@@ -358,24 +387,22 @@ class _MapScreenState extends State<MapScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final canCreateMaraude = _canCreateMaraudeForSelectedDate();
+
     return Scaffold(
       appBar: AppBar(
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.menu),
-          onPressed: _goToAuthenticateScreen,
+          onPressed: () => showNavigationMenuPanel(
+            context,
+            currentRoute: '/home',
+          ),
         ),
         title: const Text('MaraudeMap'),
         centerTitle: true,
         actions: [
-          IconButton(
-            icon: Image.asset(
-              'assets/images/logo_claire_sans_texte.png',
-              width: 28,
-              height: 28,
-            ),
-            onPressed: _recenterMap,
-          ),
+          const HeaderLogo(),
         ],
       ),
       body: Column(
@@ -437,12 +464,15 @@ class _MapScreenState extends State<MapScreen> {
                       ],
                     ),
                     child: ElevatedButton.icon(
-                      onPressed: _openCreateMaraudeScreen,
+                      onPressed:
+                          canCreateMaraude ? _openCreateMaraudeScreen : null,
                       icon: const Icon(Icons.add_rounded, size: 28),
                       label: const Text('Ajouter une maraude'),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppTheme.primaryColor,
                         foregroundColor: Colors.white,
+                        disabledBackgroundColor: AppTheme.dividerColor,
+                        disabledForegroundColor: Colors.white70,
                         elevation: 0,
                         minimumSize: const Size.fromHeight(72),
                         padding: const EdgeInsets.symmetric(

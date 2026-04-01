@@ -2,8 +2,11 @@ import 'package:flutter/material.dart';
 
 import '../config/theme.dart';
 import '../models/maraude.dart';
+import '../screens/edit_maraude_screen.dart';
 import '../widgets/bottom_bar_action.dart';
 import '../widgets/date_selector_bar.dart';
+import '../widgets/header_logo.dart';
+import '../widgets/navigation_menu_panel.dart';
 
 class ListScreen extends StatefulWidget {
   const ListScreen({super.key});
@@ -17,10 +20,6 @@ class _ListScreenState extends State<ListScreen> {
   String selectedFilterAddress = 'Tous';
   DateTime selectedDate = DateTime.now();
   bool isFilterBarVisible = false;
-
-  void _goToAuthenticateScreen() {
-    Navigator.pushReplacementNamed(context, '/authenticate');
-  }
 
   void _goToMapScreen() {
     Navigator.pushReplacementNamed(context, '/home');
@@ -44,7 +43,7 @@ class _ListScreenState extends State<ListScreen> {
     });
   }
 
-  final List<Maraude> maraudes = [
+  List<Maraude> maraudes = [
     Maraude(
       id: '1',
       associationName: 'TAYBA',
@@ -71,7 +70,7 @@ class _ListScreenState extends State<ListScreen> {
       distributionType: 'Distribution',
       latitude: 48.8530,
       longitude: 2.3610,
-      status: MaraudeStatus.planned,
+      status: MaraudeStatus.completed,
     ),
     Maraude(
       id: '3',
@@ -129,6 +128,31 @@ class _ListScreenState extends State<ListScreen> {
     }).toList();
   }
 
+  Future<void> _openEditMaraudeScreen(Maraude maraude) async {
+    final updatedMaraude = await Navigator.of(context).push<Maraude>(
+      MaterialPageRoute(
+        builder: (context) => EditMaraudeScreen(maraude: maraude),
+      ),
+    );
+
+    if (updatedMaraude == null || !mounted) {
+      return;
+    }
+
+    setState(() {
+      final index = maraudes.indexWhere((item) => item.id == updatedMaraude.id);
+      if (index != -1) {
+        maraudes[index] = updatedMaraude;
+      }
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Maraude modifiee.'),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final filteredMaraudes = getFilteredMaraudes();
@@ -138,21 +162,15 @@ class _ListScreenState extends State<ListScreen> {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.menu),
-          onPressed: _goToAuthenticateScreen,
+          onPressed: () => showNavigationMenuPanel(
+            context,
+            currentRoute: '/list',
+          ),
         ),
         title: const Text('MaraudeMap'),
         centerTitle: true,
         actions: [
-          IconButton(
-            icon: Image.asset(
-              'assets/images/logo_claire_sans_texte.png',
-              width: 28,
-              height: 28,
-            ),
-            onPressed: () {
-              Navigator.pushReplacementNamed(context, '/home');
-            },
-          ),
+          const HeaderLogo(),
         ],
       ),
       body: Column(
@@ -328,77 +346,95 @@ class _ListScreenState extends State<ListScreen> {
   Widget _buildMaraudeCard(Maraude maraude) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(
+      child: Material(
         color: Colors.grey[200],
         borderRadius: BorderRadius.circular(8),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        child: InkWell(
+          onTap: () => _openEditMaraudeScreen(maraude),
+          borderRadius: BorderRadius.circular(8),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  maraude.associationName,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
-                  ),
-                ),
-                Text(
-                  '${maraude.startTime} - ${maraude.endTime}',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: AppTheme.textSecondaryColor,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        maraude.location,
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        maraude.associationName,
+                        overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
-                          color: AppTheme.dangerColor,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w500,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
                         ),
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        maraude.address,
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: AppTheme.textSecondaryColor,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 2),
-                  child: Text(
-                    '${maraude.estimatedPlates} Plats',
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 13,
                     ),
-                  ),
+                    const SizedBox(width: 12),
+                    Row(
+                      children: [
+                        Text(
+                          '${maraude.startTime} - ${maraude.endTime}',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: AppTheme.textSecondaryColor,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Icon(
+                          Icons.edit_outlined,
+                          size: 16,
+                          color: AppTheme.primaryColor,
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            maraude.location,
+                            style: const TextStyle(
+                              color: AppTheme.dangerColor,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            maraude.address,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: AppTheme.textSecondaryColor,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 2),
+                      child: Text(
+                        '${maraude.estimatedPlates} Plats',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
-          ],
+          ),
         ),
       ),
     );

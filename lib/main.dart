@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'config/theme.dart';
+import 'screens/history_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/map_screen.dart';
 import 'screens/list_screen.dart';
+import 'screens/profile_screen.dart';
 
 void main() {
   runApp(const MyApp());
@@ -21,6 +23,8 @@ class MyApp extends StatelessWidget {
         '/authenticate': (context) => const LoginScreen(),
         '/home': (context) => const MapScreen(),
         '/list': (context) => const ListScreen(),
+        '/history': (context) => const HistoryScreen(),
+        '/profile': (context) => const ProfileScreen(),
       },
     );
   }

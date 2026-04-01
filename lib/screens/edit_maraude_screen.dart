@@ -1,40 +1,60 @@
 import 'package:flutter/material.dart';
+import 'package:latlong2/latlong.dart';
 
 import '../config/theme.dart';
+import '../models/maraude.dart';
 import 'map_address_picker_screen.dart';
 
-class CreateMaraudeScreen extends StatefulWidget {
-  const CreateMaraudeScreen({
+class EditMaraudeScreen extends StatefulWidget {
+  const EditMaraudeScreen({
     super.key,
-    required this.initialAssociation,
-    required this.initialDate,
+    required this.maraude,
   });
 
-  final String initialAssociation;
-  final DateTime initialDate;
+  final Maraude maraude;
 
   @override
-  State<CreateMaraudeScreen> createState() => _CreateMaraudeScreenState();
+  State<EditMaraudeScreen> createState() => _EditMaraudeScreenState();
 }
 
-class _CreateMaraudeScreenState extends State<CreateMaraudeScreen> {
+class _EditMaraudeScreenState extends State<EditMaraudeScreen> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _associationController;
-  final _estimatedPlatesController = TextEditingController(text: '100');
-  final _commentController = TextEditingController();
+  late final TextEditingController _estimatedPlatesController;
+  late final TextEditingController _commentController;
 
-  DateTime? _selectedDate;
-  TimeOfDay? _startTime;
-  TimeOfDay? _endTime;
-  PickedMapLocation? _pickedMapLocation;
+  late DateTime _selectedDate;
+  late TimeOfDay _startTime;
+  late TimeOfDay _endTime;
+  late PickedMapLocation _pickedMapLocation;
   bool _showValidationErrors = false;
+
+  String _safeComment(Maraude maraude) {
+    try {
+      return maraude.comment;
+    } catch (_) {
+      return '';
+    }
+  }
 
   @override
   void initState() {
     super.initState();
     _associationController =
-        TextEditingController(text: widget.initialAssociation);
-    _selectedDate = DateUtils.dateOnly(widget.initialDate);
+        TextEditingController(text: widget.maraude.associationName);
+    _estimatedPlatesController = TextEditingController(
+      text: widget.maraude.estimatedPlates.toString(),
+    );
+    _commentController = TextEditingController(
+      text: _safeComment(widget.maraude),
+    );
+    _selectedDate = widget.maraude.date;
+    _startTime = _parseTime(widget.maraude.startTime);
+    _endTime = _parseTime(widget.maraude.endTime);
+    _pickedMapLocation = PickedMapLocation(
+      point: LatLng(widget.maraude.latitude, widget.maraude.longitude),
+      label: widget.maraude.address,
+    );
   }
 
   @override
@@ -48,8 +68,8 @@ class _CreateMaraudeScreenState extends State<CreateMaraudeScreen> {
   Future<void> _pickDate() async {
     final pickedDate = await showDatePicker(
       context: context,
-      initialDate: _selectedDate ?? DateTime.now(),
-      firstDate: DateTime.now().subtract(const Duration(days: 365)),
+      initialDate: _selectedDate,
+      firstDate: DateTime.now().subtract(const Duration(days: 365 * 2)),
       lastDate: DateTime.now().add(const Duration(days: 365 * 2)),
     );
 
@@ -65,14 +85,9 @@ class _CreateMaraudeScreenState extends State<CreateMaraudeScreen> {
   Future<void> _pickTime({
     required bool isStartTime,
   }) async {
-    final fallbackInitialTime = isStartTime
-        ? const TimeOfDay(hour: 19, minute: 0)
-        : const TimeOfDay(hour: 20, minute: 0);
     final pickedTime = await showTimePicker(
       context: context,
-      initialTime: isStartTime
-          ? (_startTime ?? fallbackInitialTime)
-          : (_endTime ?? fallbackInitialTime),
+      initialTime: isStartTime ? _startTime : _endTime,
     );
 
     if (pickedTime == null) {
@@ -112,16 +127,23 @@ class _CreateMaraudeScreenState extends State<CreateMaraudeScreen> {
     });
 
     final isFormValid = _formKey.currentState?.validate() ?? false;
-    final hasSelectionErrors = _validateDate() != null ||
-        _validateStartTime() != null ||
-        _validateEndTime() != null ||
-        _validateMapAddress() != null;
-
-    if (!isFormValid || hasSelectionErrors) {
+    if (!isFormValid || _validateEndTime() != null) {
       return;
     }
 
-    Navigator.of(context).pop(true);
+    final updatedMaraude = widget.maraude.copyWith(
+      associationName: _associationController.text.trim(),
+      date: _selectedDate,
+      startTime: _formatMaraudeTime(_startTime),
+      endTime: _formatMaraudeTime(_endTime),
+      address: _pickedMapLocation.label,
+      estimatedPlates: int.parse(_estimatedPlatesController.text.trim()),
+      comment: _commentController.text.trim(),
+      latitude: _pickedMapLocation.point.latitude,
+      longitude: _pickedMapLocation.point.longitude,
+    );
+
+    Navigator.of(context).pop(updatedMaraude);
   }
 
   String _formatDate(DateTime date) {
@@ -131,61 +153,55 @@ class _CreateMaraudeScreenState extends State<CreateMaraudeScreen> {
     return '$day/$month/$year';
   }
 
-  String _formatTime(TimeOfDay time) {
+  String _formatPickerTime(TimeOfDay time) {
     final hour = time.hour.toString().padLeft(2, '0');
     final minute = time.minute.toString().padLeft(2, '0');
     return '$hour:$minute';
   }
 
+  String _formatMaraudeTime(TimeOfDay time) {
+    if (time.minute == 0) {
+      return '${time.hour}h';
+    }
+
+    return '${time.hour}h${time.minute.toString().padLeft(2, '0')}';
+  }
+
   int _timeInMinutes(TimeOfDay time) => time.hour * 60 + time.minute;
 
-  String? _validateDate() {
-    if (_selectedDate == null) {
-      return 'Selectionnez une date.';
-    }
-
-    return null;
-  }
-
-  String? _validateStartTime() {
-    if (_startTime == null) {
-      return 'Selectionnez une heure de debut.';
-    }
-
-    return null;
-  }
-
   String? _validateEndTime() {
-    if (_endTime == null) {
-      return 'Selectionnez une heure de fin.';
-    }
-
-    if (_startTime != null &&
-        _timeInMinutes(_endTime!) <= _timeInMinutes(_startTime!)) {
+    if (_timeInMinutes(_endTime) <= _timeInMinutes(_startTime)) {
       return 'L\'heure de fin doit etre apres l\'heure de debut.';
     }
 
     return null;
   }
 
-  String? _validateMapAddress() {
-    if (_pickedMapLocation == null) {
-      return 'Selectionnez une adresse sur la carte.';
+  TimeOfDay _parseTime(String value) {
+    final normalized = value.trim().toLowerCase();
+    final match = RegExp(r'^(\d{1,2})(?:h|:)?(\d{0,2})$').firstMatch(normalized);
+
+    if (match == null) {
+      return const TimeOfDay(hour: 19, minute: 0);
     }
 
-    return null;
+    final hour = int.tryParse(match.group(1) ?? '') ?? 19;
+    final minuteGroup = match.group(2) ?? '';
+    final minute = minuteGroup.isEmpty ? 0 : int.tryParse(minuteGroup) ?? 0;
+
+    return TimeOfDay(
+      hour: hour.clamp(0, 23).toInt(),
+      minute: minute.clamp(0, 59).toInt(),
+    );
   }
 
   Widget _buildSelectionField({
     required String label,
-    required String placeholder,
-    required String? value,
+    required String value,
     required IconData icon,
     required VoidCallback onTap,
     String? errorText,
   }) {
-    final hasValue = value != null && value.isNotEmpty;
-
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(8),
@@ -196,12 +212,10 @@ class _CreateMaraudeScreenState extends State<CreateMaraudeScreen> {
           errorText: errorText,
         ),
         child: Text(
-          hasValue ? value : placeholder,
-          style: TextStyle(
+          value,
+          style: const TextStyle(
             fontSize: 16,
-            color: hasValue
-                ? AppTheme.textPrimaryColor
-                : AppTheme.textSecondaryColor,
+            color: AppTheme.textPrimaryColor,
           ),
         ),
       ),
@@ -227,17 +241,13 @@ class _CreateMaraudeScreenState extends State<CreateMaraudeScreen> {
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: _showValidationErrors && _validateMapAddress() != null
-                  ? Theme.of(context).colorScheme.error
-                  : AppTheme.dividerColor,
-            ),
+            border: Border.all(color: AppTheme.dividerColor),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                _pickedMapLocation?.label ?? 'Aucun point selectionne.',
+                _pickedMapLocation.label,
                 style: const TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
@@ -246,8 +256,7 @@ class _CreateMaraudeScreenState extends State<CreateMaraudeScreen> {
               ),
               const SizedBox(height: 6),
               Text(
-                _pickedMapLocation?.coordinatesLabel ??
-                    'Touchez la carte pour choisir l\'emplacement.',
+                _pickedMapLocation.coordinatesLabel,
                 style: const TextStyle(
                   fontSize: 13,
                   color: AppTheme.textSecondaryColor,
@@ -259,11 +268,7 @@ class _CreateMaraudeScreenState extends State<CreateMaraudeScreen> {
                 child: OutlinedButton.icon(
                   onPressed: _pickAddressOnMap,
                   icon: const Icon(Icons.place_outlined),
-                  label: Text(
-                    _pickedMapLocation == null
-                        ? 'Choisir sur la carte'
-                        : 'Modifier le point',
-                  ),
+                  label: const Text('Modifier le point'),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: AppTheme.primaryColor,
                     side: const BorderSide(color: AppTheme.primaryColor),
@@ -271,16 +276,6 @@ class _CreateMaraudeScreenState extends State<CreateMaraudeScreen> {
                   ),
                 ),
               ),
-              if (_showValidationErrors && _validateMapAddress() != null) ...[
-                const SizedBox(height: 8),
-                Text(
-                  _validateMapAddress()!,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Theme.of(context).colorScheme.error,
-                  ),
-                ),
-              ],
             ],
           ),
         ),
@@ -292,7 +287,7 @@ class _CreateMaraudeScreenState extends State<CreateMaraudeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Creer une maraude'),
+        title: const Text('Modifier une maraude'),
       ),
       body: SafeArea(
         child: Form(
@@ -320,7 +315,7 @@ class _CreateMaraudeScreenState extends State<CreateMaraudeScreen> {
                     ],
                   ),
                   child: const Text(
-                    'Annoncez une maraude avec les informations principales ',
+                    'Mettez a jour une maraude prevue ou deja effectuee.',
                     style: TextStyle(
                       fontSize: 14,
                       color: AppTheme.textSecondaryColor,
@@ -345,11 +340,9 @@ class _CreateMaraudeScreenState extends State<CreateMaraudeScreen> {
                 const SizedBox(height: 16),
                 _buildSelectionField(
                   label: 'Date *',
-                  placeholder: 'Selectionnez une date',
-                  value: _selectedDate == null ? null : _formatDate(_selectedDate!),
+                  value: _formatDate(_selectedDate),
                   icon: Icons.calendar_today_outlined,
                   onTap: _pickDate,
-                  errorText: _showValidationErrors ? _validateDate() : null,
                 ),
                 const SizedBox(height: 16),
                 Row(
@@ -357,20 +350,16 @@ class _CreateMaraudeScreenState extends State<CreateMaraudeScreen> {
                     Expanded(
                       child: _buildSelectionField(
                         label: 'Heure de debut *',
-                        placeholder: 'Selectionnez',
-                        value: _startTime == null ? null : _formatTime(_startTime!),
+                        value: _formatPickerTime(_startTime),
                         icon: Icons.schedule_outlined,
                         onTap: () => _pickTime(isStartTime: true),
-                        errorText:
-                            _showValidationErrors ? _validateStartTime() : null,
                       ),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: _buildSelectionField(
                         label: 'Heure de fin *',
-                        placeholder: 'Selectionnez',
-                        value: _endTime == null ? null : _formatTime(_endTime!),
+                        value: _formatPickerTime(_endTime),
                         icon: Icons.schedule_outlined,
                         onTap: () => _pickTime(isStartTime: false),
                         errorText:
@@ -418,7 +407,7 @@ class _CreateMaraudeScreenState extends State<CreateMaraudeScreen> {
                   children: [
                     Expanded(
                       child: OutlinedButton(
-                        onPressed: () => Navigator.of(context).pop(false),
+                        onPressed: () => Navigator.of(context).pop(),
                         style: OutlinedButton.styleFrom(
                           foregroundColor: AppTheme.primaryColor,
                           side: const BorderSide(color: AppTheme.primaryColor),
