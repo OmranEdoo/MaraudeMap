@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../config/current_session.dart';
 import '../config/theme.dart';
 import '../models/maraude.dart';
 import '../screens/edit_maraude_screen.dart';
@@ -128,7 +129,26 @@ class _ListScreenState extends State<ListScreen> {
     }).toList();
   }
 
+  bool _canEditMaraude(Maraude maraude) {
+    return CurrentSession.belongsToCurrentAssociation(maraude.associationName);
+  }
+
+  void _showEditRestrictionMessage() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'Vous ne pouvez modifier que les maraudes de ${CurrentSession.associationName}.',
+        ),
+      ),
+    );
+  }
+
   Future<void> _openEditMaraudeScreen(Maraude maraude) async {
+    if (!_canEditMaraude(maraude)) {
+      _showEditRestrictionMessage();
+      return;
+    }
+
     final updatedMaraude = await Navigator.of(context).push<Maraude>(
       MaterialPageRoute(
         builder: (context) => EditMaraudeScreen(maraude: maraude),
@@ -344,13 +364,22 @@ class _ListScreenState extends State<ListScreen> {
   }
 
   Widget _buildMaraudeCard(Maraude maraude) {
+    final canEdit = _canEditMaraude(maraude);
+
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       child: Material(
         color: Colors.grey[200],
         borderRadius: BorderRadius.circular(8),
         child: InkWell(
-          onTap: () => _openEditMaraudeScreen(maraude),
+          onTap: () {
+            if (canEdit) {
+              _openEditMaraudeScreen(maraude);
+              return;
+            }
+
+            _showEditRestrictionMessage();
+          },
           borderRadius: BorderRadius.circular(8),
           child: Padding(
             padding: const EdgeInsets.all(16),
@@ -382,9 +411,11 @@ class _ListScreenState extends State<ListScreen> {
                         ),
                         const SizedBox(width: 8),
                         Icon(
-                          Icons.edit_outlined,
+                          canEdit ? Icons.edit_outlined : Icons.lock_outline,
                           size: 16,
-                          color: AppTheme.primaryColor,
+                          color: canEdit
+                              ? AppTheme.primaryColor
+                              : AppTheme.textSecondaryColor,
                         ),
                       ],
                     ),

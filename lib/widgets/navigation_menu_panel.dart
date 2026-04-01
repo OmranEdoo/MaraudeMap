@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../config/theme.dart';
 
+bool _isNavigationMenuOpen = false;
+
 class NavigationDestinationItem {
   const NavigationDestinationItem({
     required this.label,
@@ -18,6 +20,13 @@ Future<void> showNavigationMenuPanel(
   BuildContext context, {
   required String currentRoute,
 }) {
+  final rootNavigator = Navigator.of(context, rootNavigator: true);
+
+  if (_isNavigationMenuOpen) {
+    rootNavigator.pop();
+    return Future.value();
+  }
+
   const destinations = <NavigationDestinationItem>[
     NavigationDestinationItem(
       label: 'Carte',
@@ -42,20 +51,34 @@ Future<void> showNavigationMenuPanel(
   ];
 
   final mediaQuery = MediaQuery.of(context);
-  final panelTopOffset = mediaQuery.padding.top + kToolbarHeight;
+  final headerBottomOffset = mediaQuery.padding.top + kToolbarHeight;
+  const panelOverlap = 1.0;
+
+  _isNavigationMenuOpen = true;
 
   return showGeneralDialog<void>(
     context: context,
+    useRootNavigator: true,
     barrierDismissible: true,
     barrierLabel: 'Fermer le menu',
-    barrierColor: Colors.black26,
+    barrierColor: Colors.transparent,
     pageBuilder: (dialogContext, _, __) {
       return Material(
         type: MaterialType.transparency,
         child: Stack(
           children: [
+            Positioned.fill(
+              top: headerBottomOffset,
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () => Navigator.of(dialogContext).pop(),
+                child: Container(
+                  color: Colors.black26,
+                ),
+              ),
+            ),
             Positioned(
-              top: panelTopOffset,
+              top: headerBottomOffset - panelOverlap,
               left: 0,
               right: 0,
               child: SafeArea(
@@ -68,13 +91,6 @@ Future<void> showNavigationMenuPanel(
                     borderRadius: const BorderRadius.vertical(
                       bottom: Radius.circular(24),
                     ),
-                    boxShadow: const [
-                      BoxShadow(
-                        color: Color(0x22000000),
-                        blurRadius: 18,
-                        offset: Offset(0, 8),
-                      ),
-                    ],
                   ),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
@@ -132,7 +148,9 @@ Future<void> showNavigationMenuPanel(
         ),
       );
     },
-  );
+  ).whenComplete(() {
+    _isNavigationMenuOpen = false;
+  });
 }
 
 class _NavigationPanelAction extends StatelessWidget {

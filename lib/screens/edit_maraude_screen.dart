@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:latlong2/latlong.dart';
 
+import '../config/current_session.dart';
 import '../config/theme.dart';
 import '../models/maraude.dart';
 import 'map_address_picker_screen.dart';
@@ -35,6 +36,12 @@ class _EditMaraudeScreenState extends State<EditMaraudeScreen> {
     } catch (_) {
       return '';
     }
+  }
+
+  bool get _canEditCurrentMaraude {
+    return CurrentSession.belongsToCurrentAssociation(
+      widget.maraude.associationName,
+    );
   }
 
   @override
@@ -122,6 +129,10 @@ class _EditMaraudeScreenState extends State<EditMaraudeScreen> {
   }
 
   void _saveForm() {
+    if (!_canEditCurrentMaraude) {
+      return;
+    }
+
     setState(() {
       _showValidationErrors = true;
     });
@@ -285,6 +296,64 @@ class _EditMaraudeScreenState extends State<EditMaraudeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (!_canEditCurrentMaraude) {
+      return Scaffold(
+        appBar: AppBar(
+          title: const Text('Modifier une maraude'),
+        ),
+        body: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Center(
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Color(0x12000000),
+                      blurRadius: 12,
+                      offset: Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.lock_outline,
+                      size: 40,
+                      color: AppTheme.primaryColor,
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      'Seules les maraudes de ${CurrentSession.associationName} peuvent etre modifiees.',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: AppTheme.textSecondaryColor,
+                        height: 1.5,
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: () => Navigator.of(context).pop(),
+                        child: const Text('Fermer'),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Modifier une maraude'),
@@ -326,6 +395,7 @@ class _EditMaraudeScreenState extends State<EditMaraudeScreen> {
                 const SizedBox(height: 20),
                 TextFormField(
                   controller: _associationController,
+                  readOnly: true,
                   decoration: const InputDecoration(
                     labelText: 'Association *',
                   ),

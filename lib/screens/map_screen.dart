@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 
+import '../config/current_session.dart';
 import '../config/theme.dart';
 import '../models/maraude.dart';
 import '../screens/create_maraude_screen.dart';
@@ -83,17 +84,10 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   Future<void> _openCreateMaraudeScreen() async {
-    final availableAssociations = _associationOptions()
-        .where((association) => association != 'Tous')
-        .toList();
-    final initialAssociation = selectedFilterAssociation != 'Tous'
-        ? selectedFilterAssociation
-        : (availableAssociations.isNotEmpty ? availableAssociations.first : 'TAYBA');
-
     final isSaved = await Navigator.of(context).push<bool>(
       MaterialPageRoute(
         builder: (context) => CreateMaraudeScreen(
-          initialAssociation: initialAssociation,
+          initialAssociation: CurrentSession.associationName,
           initialDate: selectedDate,
         ),
       ),
@@ -109,6 +103,11 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   Future<void> _openEditMaraudeScreen(Maraude maraude) async {
+    if (!_canEditMaraude(maraude)) {
+      _showEditRestrictionMessage();
+      return;
+    }
+
     final updatedMaraude = await Navigator.of(context).push<Maraude>(
       MaterialPageRoute(
         builder: (context) => EditMaraudeScreen(maraude: maraude),
@@ -129,6 +128,20 @@ class _MapScreenState extends State<MapScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text('Maraude modifiee.'),
+      ),
+    );
+  }
+
+  bool _canEditMaraude(Maraude maraude) {
+    return CurrentSession.belongsToCurrentAssociation(maraude.associationName);
+  }
+
+  void _showEditRestrictionMessage() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'Vous ne pouvez modifier que les maraudes de ${CurrentSession.associationName}.',
+        ),
       ),
     );
   }
@@ -185,6 +198,8 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   void _openMaraudeDetail(Maraude maraude) {
+    final canEdit = _canEditMaraude(maraude);
+
     showModalBottomSheet(
       context: context,
       builder: (sheetContext) => Container(
@@ -207,11 +222,23 @@ class _MapScreenState extends State<MapScreen> {
             const SizedBox(height: 10),
             Text('${maraude.estimatedPlates} Plats'),
             const SizedBox(height: 20),
+            if (!canEdit) ...[
+              Text(
+                'Modification reservee a l\'association ${CurrentSession.associationName}.',
+                style: const TextStyle(
+                  fontSize: 13,
+                  color: AppTheme.textSecondaryColor,
+                ),
+              ),
+              const SizedBox(height: 12),
+            ],
             ElevatedButton(
-              onPressed: () {
-                Navigator.pop(sheetContext);
-                _openEditMaraudeScreen(maraude);
-              },
+              onPressed: canEdit
+                  ? () {
+                      Navigator.pop(sheetContext);
+                      _openEditMaraudeScreen(maraude);
+                    }
+                  : null,
               child: const Text('Modifier la maraude'),
             ),
           ],

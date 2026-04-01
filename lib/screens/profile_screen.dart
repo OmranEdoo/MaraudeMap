@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../config/current_session.dart';
 import '../config/theme.dart';
 import '../widgets/header_logo.dart';
 import '../widgets/navigation_menu_panel.dart';
@@ -116,11 +117,11 @@ class ProfileScreen extends StatelessWidget {
                               ),
                             ),
                             const SizedBox(width: 16),
-                            const Expanded(
+                            Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text(
+                                  const Text(
                                     'Profil utilisateur',
                                     style: TextStyle(
                                       fontSize: 20,
@@ -128,9 +129,9 @@ class ProfileScreen extends StatelessWidget {
                                       color: AppTheme.textPrimaryColor,
                                     ),
                                   ),
-                                  SizedBox(height: 4),
+                                  const SizedBox(height: 4),
                                   Text(
-                                    'Membre connecte de l association TAYBA',
+                                    'Membre connecte de l association ${CurrentSession.associationName}',
                                     style: TextStyle(
                                       color: AppTheme.textSecondaryColor,
                                       height: 1.4,
@@ -145,19 +146,19 @@ class ProfileScreen extends StatelessWidget {
                         _buildInfoRow(
                           icon: Icons.badge_outlined,
                           label: 'Nom',
-                          value: 'Membre TAYBA',
+                          value: CurrentSession.displayName,
                         ),
                         const SizedBox(height: 18),
                         _buildInfoRow(
                           icon: Icons.mail_outline,
                           label: 'Email',
-                          value: 'membre@tayba.org',
+                          value: CurrentSession.email,
                         ),
                         const SizedBox(height: 18),
                         _buildInfoRow(
                           icon: Icons.groups_outlined,
                           label: 'Association',
-                          value: 'TAYBA',
+                          value: CurrentSession.associationName,
                         ),
                         const SizedBox(height: 28),
                         ElevatedButton.icon(

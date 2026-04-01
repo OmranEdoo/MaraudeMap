@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../config/current_session.dart';
 import '../config/theme.dart';
 import 'map_address_picker_screen.dart';
 
@@ -33,7 +34,7 @@ class _CreateMaraudeScreenState extends State<CreateMaraudeScreen> {
   void initState() {
     super.initState();
     _associationController =
-        TextEditingController(text: widget.initialAssociation);
+        TextEditingController(text: CurrentSession.associationName);
     _selectedDate = DateUtils.dateOnly(widget.initialDate);
   }
 
@@ -331,6 +332,7 @@ class _CreateMaraudeScreenState extends State<CreateMaraudeScreen> {
                 const SizedBox(height: 20),
                 TextFormField(
                   controller: _associationController,
+                  readOnly: true,
                   decoration: const InputDecoration(
                     labelText: 'Association *',
                   ),
