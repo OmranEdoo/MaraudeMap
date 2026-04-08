@@ -4,6 +4,7 @@ import 'package:latlong2/latlong.dart';
 import '../config/current_session.dart';
 import '../config/theme.dart';
 import '../models/maraude.dart';
+import '../repositories/app_repositories.dart';
 import 'map_address_picker_screen.dart';
 
 class EditMaraudeScreen extends StatefulWidget {
@@ -21,14 +22,17 @@ class EditMaraudeScreen extends StatefulWidget {
 class _EditMaraudeScreenState extends State<EditMaraudeScreen> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _associationController;
+  late final TextEditingController _placeNameController;
   late final TextEditingController _estimatedPlatesController;
   late final TextEditingController _commentController;
+  final _repository = AppRepositories.maraudes;
 
   late DateTime _selectedDate;
   late TimeOfDay _startTime;
   late TimeOfDay _endTime;
   late PickedMapLocation _pickedMapLocation;
   bool _showValidationErrors = false;
+  bool _isSaving = false;
 
   String _safeComment(Maraude maraude) {
     try {
@@ -49,6 +53,9 @@ class _EditMaraudeScreenState extends State<EditMaraudeScreen> {
     super.initState();
     _associationController =
         TextEditingController(text: widget.maraude.associationName);
+    _placeNameController = TextEditingController(
+      text: _initialPlaceName(widget.maraude),
+    );
     _estimatedPlatesController = TextEditingController(
       text: widget.maraude.estimatedPlates.toString(),
     );
@@ -67,6 +74,7 @@ class _EditMaraudeScreenState extends State<EditMaraudeScreen> {
   @override
   void dispose() {
     _associationController.dispose();
+    _placeNameController.dispose();
     _estimatedPlatesController.dispose();
     _commentController.dispose();
     super.dispose();
@@ -128,8 +136,8 @@ class _EditMaraudeScreenState extends State<EditMaraudeScreen> {
     });
   }
 
-  void _saveForm() {
-    if (!_canEditCurrentMaraude) {
+  Future<void> _saveForm() async {
+    if (!_canEditCurrentMaraude || _isSaving) {
       return;
     }
 
@@ -144,17 +152,48 @@ class _EditMaraudeScreenState extends State<EditMaraudeScreen> {
 
     final updatedMaraude = widget.maraude.copyWith(
       associationName: _associationController.text.trim(),
+      location: _placeNameController.text.trim(),
       date: _selectedDate,
       startTime: _formatMaraudeTime(_startTime),
       endTime: _formatMaraudeTime(_endTime),
-      address: _pickedMapLocation.label,
+      address: 'Point selectionne sur la carte',
       estimatedPlates: int.parse(_estimatedPlatesController.text.trim()),
       comment: _commentController.text.trim(),
       latitude: _pickedMapLocation.point.latitude,
       longitude: _pickedMapLocation.point.longitude,
     );
 
-    Navigator.of(context).pop(updatedMaraude);
+    setState(() {
+      _isSaving = true;
+    });
+
+    try {
+      final savedMaraude = await _repository.update(updatedMaraude);
+
+      if (!mounted) {
+        return;
+      }
+
+      Navigator.of(context).pop(savedMaraude);
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Modification impossible pour le moment.'),
+        ),
+      );
+    } finally {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _isSaving = false;
+      });
+    }
   }
 
   String _formatDate(DateTime date) {
@@ -204,6 +243,39 @@ class _EditMaraudeScreenState extends State<EditMaraudeScreen> {
       hour: hour.clamp(0, 23).toInt(),
       minute: minute.clamp(0, 59).toInt(),
     );
+  }
+
+  String _initialPlaceName(Maraude maraude) {
+    final location = _cleanReadableText(maraude.location);
+    if (location.isNotEmpty) {
+      return location;
+    }
+
+    return _cleanReadableText(maraude.address);
+  }
+
+  String _cleanReadableText(String value) {
+    final trimmed = value.trim();
+    if (trimmed.isEmpty ||
+        trimmed == 'Point selectionne sur la carte' ||
+        _looksLikeCoordinateText(trimmed)) {
+      return '';
+    }
+
+    return trimmed;
+  }
+
+  bool _looksLikeCoordinateText(String value) {
+    final normalized = value.trim().toLowerCase();
+    if (normalized.contains('point selectionne') ||
+        normalized.contains('lat ') ||
+        normalized.contains('lng ')) {
+      return true;
+    }
+
+    return RegExp(
+      r'-?\d{1,2}\.\d{3,}.*-?\d{1,3}\.\d{3,}',
+    ).hasMatch(normalized);
   }
 
   Widget _buildSelectionField({
@@ -258,7 +330,7 @@ class _EditMaraudeScreenState extends State<EditMaraudeScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                _pickedMapLocation.label,
+                'Point selectionne sur la carte.',
                 style: const TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
@@ -266,12 +338,27 @@ class _EditMaraudeScreenState extends State<EditMaraudeScreen> {
                 ),
               ),
               const SizedBox(height: 6),
-              Text(
-                _pickedMapLocation.coordinatesLabel,
-                style: const TextStyle(
+              const Text(
+                'Le point exact est enregistre sur la carte.',
+                style: TextStyle(
                   fontSize: 13,
                   color: AppTheme.textSecondaryColor,
                 ),
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _placeNameController,
+                decoration: const InputDecoration(
+                  labelText: 'Nom de l\'endroit *',
+                  hintText: 'Ex : Gare du Nord / Rue de la Republique',
+                ),
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) {
+                    return 'Nommez l\'endroit selectionne.';
+                  }
+
+                  return null;
+                },
               ),
               const SizedBox(height: 16),
               SizedBox(
@@ -493,7 +580,18 @@ class _EditMaraudeScreenState extends State<EditMaraudeScreen> {
                         style: ElevatedButton.styleFrom(
                           minimumSize: const Size.fromHeight(52),
                         ),
-                        child: const Text('Enregistrer'),
+                        child: _isSaving
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    Colors.white,
+                                  ),
+                                ),
+                              )
+                            : const Text('Enregistrer'),
                       ),
                     ),
                   ],

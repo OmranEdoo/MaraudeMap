@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
 import '../config/theme.dart';
+import '../services/auth_service.dart';
+import '../services/profile_service.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -12,6 +16,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
+  bool _isSubmitting = false;
 
   @override
   void dispose() {
@@ -20,8 +25,80 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
-  void _handleLogin() {
-    Navigator.pushReplacementNamed(context, '/home');
+  Future<void> _handleLogin() async {
+    if (_isSubmitting) {
+      return;
+    }
+
+    final email = _emailController.text.trim();
+    final password = _passwordController.text;
+
+    if (email.isEmpty || password.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Renseignez votre email et votre mot de passe.'),
+        ),
+      );
+      return;
+    }
+
+    if (!AuthService.instance.isConfigured) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Supabase n\'est pas encore configure. Ouverture en mode demo.',
+          ),
+        ),
+      );
+      Navigator.pushReplacementNamed(context, '/home');
+      return;
+    }
+
+    setState(() {
+      _isSubmitting = true;
+    });
+
+    try {
+      await AuthService.instance.signInWithPassword(
+        email: email,
+        password: password,
+      );
+      await ProfileService.instance.hydrateCurrentSession();
+
+      if (!mounted) {
+        return;
+      }
+
+      Navigator.pushReplacementNamed(context, '/home');
+    } on AuthException catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(error.message),
+        ),
+      );
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Connexion impossible pour le moment.'),
+        ),
+      );
+    } finally {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _isSubmitting = false;
+      });
+    }
   }
 
   @override
@@ -91,7 +168,18 @@ class _LoginScreenState extends State<LoginScreen> {
                           backgroundColor: AppTheme.primaryColor,
                           foregroundColor: Colors.white,
                         ),
-                        child: const Text('Se connecter'),
+                        child: _isSubmitting
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    Colors.white,
+                                  ),
+                                ),
+                              )
+                            : const Text('Se connecter'),
                       ),
                       const SizedBox(height: 20),
                       GestureDetector(

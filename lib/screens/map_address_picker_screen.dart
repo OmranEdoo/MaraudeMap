@@ -19,6 +19,7 @@ class MapAddressPickerScreen extends StatefulWidget {
 class _MapAddressPickerScreenState extends State<MapAddressPickerScreen> {
   static const LatLng _parisCenter = LatLng(48.8566, 2.3522);
   static const double _defaultZoom = 13.2;
+  static const String _selectedPointLabel = 'Point selectionne sur la carte';
 
   final MapController _mapController = MapController();
   LatLng? _selectedPoint;
@@ -35,16 +36,6 @@ class _MapAddressPickerScreenState extends State<MapAddressPickerScreen> {
     super.dispose();
   }
 
-  String _formatCoordinate(double value) {
-    return value.toStringAsFixed(5);
-  }
-
-  String _buildLocationLabel(LatLng point) {
-    return 'Point selectionne '
-        '(${_formatCoordinate(point.latitude)}, '
-        '${_formatCoordinate(point.longitude)})';
-  }
-
   void _confirmSelection() {
     final selectedPoint = _selectedPoint;
     if (selectedPoint == null) {
@@ -54,7 +45,7 @@ class _MapAddressPickerScreenState extends State<MapAddressPickerScreen> {
     Navigator.of(context).pop(
       PickedMapLocation(
         point: selectedPoint,
-        label: _buildLocationLabel(selectedPoint),
+        label: _selectedPointLabel,
       ),
     );
   }
@@ -64,8 +55,7 @@ class _MapAddressPickerScreenState extends State<MapAddressPickerScreen> {
     final selectedPoint = _selectedPoint;
     final previewText = selectedPoint == null
         ? 'Touchez la carte pour placer la maraude.'
-        : 'Lat ${_formatCoordinate(selectedPoint.latitude)} / '
-            'Lng ${_formatCoordinate(selectedPoint.longitude)}';
+        : 'Point selectionne. Vous pourrez nommer cet endroit dans le formulaire.';
 
     return Scaffold(
       appBar: AppBar(
@@ -189,8 +179,4 @@ class PickedMapLocation {
 
   final LatLng point;
   final String label;
-
-  String get coordinatesLabel =>
-      'Lat ${point.latitude.toStringAsFixed(5)} / '
-      'Lng ${point.longitude.toStringAsFixed(5)}';
 }

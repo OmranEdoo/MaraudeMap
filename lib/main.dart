@@ -1,12 +1,18 @@
 import 'package:flutter/material.dart';
+
 import 'config/theme.dart';
+import 'services/profile_service.dart';
+import 'services/supabase_bootstrap.dart';
 import 'screens/history_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/map_screen.dart';
 import 'screens/list_screen.dart';
 import 'screens/profile_screen.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await SupabaseBootstrap.initialize();
+  await ProfileService.instance.hydrateCurrentSession();
   runApp(const MyApp());
 }
 

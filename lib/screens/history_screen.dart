@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../config/theme.dart';
 import '../models/maraude.dart';
+import '../repositories/app_repositories.dart';
 import '../widgets/header_logo.dart';
 import '../widgets/navigation_menu_panel.dart';
 
@@ -28,111 +29,56 @@ class _HistoryScreenState extends State<HistoryScreen> {
     'decembre',
   ];
 
-  late final List<Maraude> _pastMaraudes = _buildPastMaraudes();
-  String _selectedMonth = 'Tous';
+  final _repository = AppRepositories.maraudes;
+
+  List<Maraude> _pastMaraudes = [];
+  DateTime? _selectedStartDate;
+  DateTime? _selectedEndDate;
   String _selectedAssociation = 'Tous';
   String _selectedZone = 'Tous';
-  String _selectedType = 'Tous';
+  bool _isLoading = true;
+  String? _loadError;
 
-  List<Maraude> _buildPastMaraudes() {
-    final today = DateUtils.dateOnly(DateTime.now());
-
-    return [
-      Maraude(
-        id: 'history-1',
-        associationName: 'TAYBA',
-        location: 'Stalingrad',
-        address: 'Place de la Bataille de Stalingrad, 75019 Paris',
-        date: today.subtract(const Duration(days: 2)),
-        startTime: '19h00',
-        endTime: '20h30',
-        estimatedPlates: 130,
-        distributionType: 'Repas chaud',
-        comment: 'Distribution terminee',
-        latitude: 48.8841,
-        longitude: 2.3701,
-        status: MaraudeStatus.completed,
-      ),
-      Maraude(
-        id: 'history-2',
-        associationName: 'EILMY',
-        location: 'Pont-Marie',
-        address: 'Quai de l Hotel de Ville, 75004 Paris',
-        date: today.subtract(const Duration(days: 7)),
-        startTime: '20h00',
-        endTime: '21h15',
-        estimatedPlates: 95,
-        distributionType: 'Colis alimentaire',
-        comment: 'Affluence reguliere',
-        latitude: 48.8529,
-        longitude: 2.3576,
-        status: MaraudeStatus.completed,
-      ),
-      Maraude(
-        id: 'history-3',
-        associationName: 'TAYBA',
-        location: 'Bastille',
-        address: 'Place de la Bastille, 75011 Paris',
-        date: today.subtract(const Duration(days: 18)),
-        startTime: '19h30',
-        endTime: '21h00',
-        estimatedPlates: 110,
-        distributionType: 'Repas chaud',
-        comment: 'Equipe complete',
-        latitude: 48.8532,
-        longitude: 2.3692,
-        status: MaraudeStatus.completed,
-      ),
-      Maraude(
-        id: 'history-4',
-        associationName: 'Aurore',
-        location: 'Porte de la Villette',
-        address: 'Avenue de la Porte de la Villette, 75019 Paris',
-        date: today.subtract(const Duration(days: 34)),
-        startTime: '18h45',
-        endTime: '20h00',
-        estimatedPlates: 85,
-        distributionType: 'Boissons chaudes',
-        comment: 'Intervention en duo',
-        latitude: 48.8985,
-        longitude: 2.3887,
-        status: MaraudeStatus.completed,
-      ),
-      Maraude(
-        id: 'history-5',
-        associationName: 'TAYBA',
-        location: 'Foyer Ivry',
-        address: 'Rue Michelet, 94200 Ivry-sur-Seine',
-        date: today.subtract(const Duration(days: 48)),
-        startTime: '19h15',
-        endTime: '20h15',
-        estimatedPlates: 140,
-        distributionType: 'Repas chaud',
-        comment: 'Distribution en exterieur',
-        latitude: 48.8151,
-        longitude: 2.3872,
-        status: MaraudeStatus.completed,
-      ),
-      Maraude(
-        id: 'history-6',
-        associationName: 'EILMY',
-        location: 'Nation',
-        address: 'Place de la Nation, 75012 Paris',
-        date: today.subtract(const Duration(days: 63)),
-        startTime: '20h15',
-        endTime: '21h00',
-        estimatedPlates: 75,
-        distributionType: 'Kits hygiene',
-        comment: 'Bonne coordination terrain',
-        latitude: 48.8483,
-        longitude: 2.3959,
-        status: MaraudeStatus.completed,
-      ),
-    ];
+  @override
+  void initState() {
+    super.initState();
+    _loadPastMaraudes();
   }
 
-  String _monthLabel(DateTime date) {
-    return '${_monthNames[date.month - 1]} ${date.year}';
+  Future<void> _loadPastMaraudes() async {
+    setState(() {
+      _isLoading = true;
+      _loadError = null;
+    });
+
+    try {
+      final loaded = await _repository.listPast(
+        beforeDate: DateTime(2100, 1, 1),
+      );
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _pastMaraudes = loaded;
+      });
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _loadError = 'Impossible de charger l\'historique.';
+      });
+    } finally {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _isLoading = false;
+      });
+    }
   }
 
   String _formatDate(DateTime date) {
@@ -140,33 +86,58 @@ class _HistoryScreenState extends State<HistoryScreen> {
         '${_monthNames[date.month - 1]} ${date.year}';
   }
 
-  List<String> _monthOptions() {
-    final options = <String>{};
-    for (final maraude in _pastMaraudes) {
-      options.add(_monthLabel(maraude.date));
+  String _formatFilterDate(DateTime? date) {
+    if (date == null) {
+      return 'Toutes';
     }
 
-    final sortedOptions = options.toList()
-      ..sort((a, b) {
-        final aParts = a.split(' ');
-        final bParts = b.split(' ');
-        final aMonth = _monthNames.indexOf(aParts.first);
-        final bMonth = _monthNames.indexOf(bParts.first);
-        final aYear = int.parse(aParts.last);
-        final bYear = int.parse(bParts.last);
-        if (aYear != bYear) {
-          return bYear.compareTo(aYear);
-        }
-        return bMonth.compareTo(aMonth);
-      });
+    final day = date.day.toString().padLeft(2, '0');
+    final month = date.month.toString().padLeft(2, '0');
+    final year = date.year.toString();
+    return '$day/$month/$year';
+  }
 
-    return ['Tous', ...sortedOptions];
+  Future<void> _pickStartDate() async {
+    final pickedDate = await showDatePicker(
+      context: context,
+      initialDate: _selectedStartDate ?? _selectedEndDate ?? DateTime.now(),
+      firstDate: DateTime(2020, 1, 1),
+      lastDate: _selectedEndDate ?? DateTime(2100, 1, 1),
+    );
+
+    if (pickedDate == null || !mounted) {
+      return;
+    }
+
+    setState(() {
+      _selectedStartDate = DateUtils.dateOnly(pickedDate);
+    });
+  }
+
+  Future<void> _pickEndDate() async {
+    final pickedDate = await showDatePicker(
+      context: context,
+      initialDate: _selectedEndDate ?? _selectedStartDate ?? DateTime.now(),
+      firstDate: _selectedStartDate ?? DateTime(2020, 1, 1),
+      lastDate: DateTime(2100, 1, 1),
+    );
+
+    if (pickedDate == null || !mounted) {
+      return;
+    }
+
+    setState(() {
+      _selectedEndDate = DateUtils.dateOnly(pickedDate);
+    });
   }
 
   List<String> _optionsFrom(String Function(Maraude maraude) selector) {
     final options = <String>{};
     for (final maraude in _pastMaraudes) {
-      options.add(selector(maraude));
+      final value = selector(maraude).trim();
+      if (value.isNotEmpty) {
+        options.add(value);
+      }
     }
 
     final sortedOptions = options.toList()..sort();
@@ -174,90 +145,255 @@ class _HistoryScreenState extends State<HistoryScreen> {
   }
 
   List<Maraude> _filteredMaraudes() {
-    final today = DateUtils.dateOnly(DateTime.now());
-
     final filtered = _pastMaraudes.where((maraude) {
       final maraudeDay = DateUtils.dateOnly(maraude.date);
-      final matchesHistory = maraudeDay.isBefore(today);
-      final matchesMonth =
-          _selectedMonth == 'Tous' || _monthLabel(maraude.date) == _selectedMonth;
+      final matchesStart = _selectedStartDate == null ||
+          !maraudeDay.isBefore(_selectedStartDate!);
+      final matchesEnd =
+          _selectedEndDate == null || !maraudeDay.isAfter(_selectedEndDate!);
       final matchesAssociation = _selectedAssociation == 'Tous' ||
           maraude.associationName == _selectedAssociation;
       final matchesZone =
-          _selectedZone == 'Tous' || maraude.location == _selectedZone;
-      final matchesType =
-          _selectedType == 'Tous' || maraude.distributionType == _selectedType;
+          _selectedZone == 'Tous' ||
+          _displayLocationLabel(maraude) == _selectedZone;
 
-      return matchesHistory &&
-          matchesMonth &&
+      return matchesStart &&
+          matchesEnd &&
           matchesAssociation &&
-          matchesZone &&
-          matchesType;
+          matchesZone;
     }).toList()
       ..sort((a, b) => b.date.compareTo(a.date));
 
     return filtered;
   }
 
-  Widget _buildFilterChip({
+  bool _looksLikeCoordinateText(String value) {
+    final normalized = value.trim().toLowerCase();
+    if (normalized.isEmpty) {
+      return false;
+    }
+
+    if (normalized.contains('point selectionne') ||
+        normalized.contains('lat ') ||
+        normalized.contains('lng ')) {
+      return true;
+    }
+
+    return RegExp(
+      r'-?\d{1,2}\.\d{3,}.*-?\d{1,3}\.\d{3,}',
+    ).hasMatch(normalized);
+  }
+
+  String _cleanReadableText(String value) {
+    final trimmed = value.trim();
+    if (trimmed.isEmpty ||
+        trimmed == 'Point selectionne sur la carte' ||
+        _looksLikeCoordinateText(trimmed)) {
+      return '';
+    }
+
+    return trimmed;
+  }
+
+  String _displayLocationLabel(Maraude maraude) {
+    final location = _cleanReadableText(maraude.location);
+    if (location.isNotEmpty) {
+      return location;
+    }
+
+    final address = _cleanReadableText(maraude.address);
+    if (address.isNotEmpty) {
+      final firstPart = address.split(',').first.trim();
+      return firstPart.isNotEmpty ? firstPart : address;
+    }
+
+    return 'Zone selectionnee sur la carte';
+  }
+
+  String _displayAddressLabel(Maraude maraude) {
+    final primaryLabel = _displayLocationLabel(maraude);
+    final address = _cleanReadableText(maraude.address);
+    if (address.isNotEmpty && address != primaryLabel) {
+      return address;
+    }
+
+    final location = _cleanReadableText(maraude.location);
+    if (location.isNotEmpty && location != primaryLabel) {
+      return location;
+    }
+
+    return '';
+  }
+
+  String _statusLabel(Maraude maraude) {
+    switch (maraude.status) {
+      case MaraudeStatus.completed:
+        return 'Effectuee';
+      case MaraudeStatus.ongoing:
+        return 'En cours';
+      case MaraudeStatus.planned:
+        return 'Prevue';
+    }
+  }
+
+  Color _statusColor(Maraude maraude) {
+    switch (maraude.status) {
+      case MaraudeStatus.completed:
+        return AppTheme.successColor;
+      case MaraudeStatus.ongoing:
+        return AppTheme.warningColor;
+      case MaraudeStatus.planned:
+        return AppTheme.primaryColor;
+    }
+  }
+
+  Widget _buildFilterField({
     required String label,
     required String selectedValue,
     required List<String> options,
     required ValueChanged<String> onSelected,
+    required double width,
   }) {
-    final displayedLabel =
-        selectedValue == 'Tous' ? label : '$label : $selectedValue';
-
-    return PopupMenuButton<String>(
-      onSelected: onSelected,
-      itemBuilder: (context) {
-        return options
-            .map(
-              (value) => PopupMenuItem<String>(
-                value: value,
-                child: Text(value),
+    return SizedBox(
+      width: width,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: AppTheme.textPrimaryColor,
+            ),
+          ),
+          const SizedBox(height: 8),
+          PopupMenuButton<String>(
+            onSelected: onSelected,
+            itemBuilder: (context) {
+              return options
+                  .map(
+                    (value) => PopupMenuItem<String>(
+                      value: value,
+                      child: Text(value),
+                    ),
+                  )
+                  .toList();
+            },
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: AppTheme.primaryColor),
               ),
-            )
-            .toList();
-      },
-      child: Container(
-        constraints: const BoxConstraints(
-          minWidth: 120,
-          maxWidth: 190,
-        ),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: AppTheme.primaryColor),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Flexible(
-              child: Text(
-                displayedLabel,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: AppTheme.primaryColor,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      selectedValue,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: AppTheme.primaryColor,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  const Icon(
+                    Icons.arrow_drop_down,
+                    color: AppTheme.primaryColor,
+                    size: 18,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDateFilterField({
+    required String label,
+    required DateTime? selectedDate,
+    required VoidCallback onTap,
+    required VoidCallback onClear,
+    required double width,
+  }) {
+    return SizedBox(
+      width: width,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: AppTheme.textPrimaryColor,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: onTap,
+              borderRadius: BorderRadius.circular(20),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 12,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: AppTheme.primaryColor),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        _formatFilterDate(selectedDate),
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: AppTheme.primaryColor,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                    if (selectedDate != null)
+                      GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onTap: onClear,
+                        child: const Padding(
+                          padding: EdgeInsets.only(left: 8),
+                          child: Icon(
+                            Icons.close,
+                            color: AppTheme.primaryColor,
+                            size: 16,
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
               ),
             ),
-            const SizedBox(width: 8),
-            const Icon(
-              Icons.arrow_drop_down,
-              color: AppTheme.primaryColor,
-              size: 18,
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 
   Widget _buildHistoryCard(Maraude maraude) {
+    final locationLabel = _displayLocationLabel(maraude);
+    final addressLabel = _displayAddressLabel(maraude);
+    final statusColor = _statusColor(maraude);
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -304,13 +440,13 @@ class _HistoryScreenState extends State<HistoryScreen> {
                 padding:
                     const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
-                  color: AppTheme.successColor.withOpacity(0.12),
+                  color: statusColor.withOpacity(0.12),
                   borderRadius: BorderRadius.circular(999),
                 ),
-                child: const Text(
-                  'Effectuee',
+                child: Text(
+                  _statusLabel(maraude),
                   style: TextStyle(
-                    color: AppTheme.successColor,
+                    color: statusColor,
                     fontSize: 11,
                     fontWeight: FontWeight.w700,
                   ),
@@ -350,21 +486,23 @@ class _HistoryScreenState extends State<HistoryScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      maraude.location,
+                      locationLabel,
                       style: const TextStyle(
                         fontWeight: FontWeight.w600,
                         color: AppTheme.textPrimaryColor,
                       ),
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      maraude.address,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: AppTheme.textSecondaryColor,
-                        height: 1.4,
+                    if (addressLabel.isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        addressLabel,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: AppTheme.textSecondaryColor,
+                          height: 1.4,
+                        ),
                       ),
-                    ),
+                    ],
                   ],
                 ),
               ),
@@ -376,8 +514,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
             runSpacing: 8,
             children: [
               _buildInfoPill('${maraude.estimatedPlates} plats'),
-              _buildInfoPill('Zone : ${maraude.location}'),
-              _buildInfoPill('Type : ${maraude.distributionType}'),
+              _buildInfoPill('Zone : $locationLabel'),
             ],
           ),
         ],
@@ -398,6 +535,37 @@ class _HistoryScreenState extends State<HistoryScreen> {
           fontSize: 12,
           fontWeight: FontWeight.w600,
           color: AppTheme.primaryColor,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildErrorState() {
+    return Center(
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              _loadError!,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: AppTheme.textSecondaryColor,
+                height: 1.5,
+              ),
+            ),
+            const SizedBox(height: 12),
+            ElevatedButton(
+              onPressed: _loadPastMaraudes,
+              child: const Text('Reessayer'),
+            ),
+          ],
         ),
       ),
     );
@@ -453,101 +621,130 @@ class _HistoryScreenState extends State<HistoryScreen> {
                     ),
                   ),
                   const SizedBox(height: 12),
-                  Wrap(
-                    spacing: 10,
-                    runSpacing: 10,
-                    children: [
-                      _buildFilterChip(
-                        label: 'Mois',
-                        selectedValue: _selectedMonth,
-                        options: _monthOptions(),
-                        onSelected: (value) {
-                          setState(() {
-                            _selectedMonth = value;
-                          });
-                        },
-                      ),
-                      _buildFilterChip(
-                        label: 'Association',
-                        selectedValue: _selectedAssociation,
-                        options: _optionsFrom(
-                          (maraude) => maraude.associationName,
-                        ),
-                        onSelected: (value) {
-                          setState(() {
-                            _selectedAssociation = value;
-                          });
-                        },
-                      ),
-                      _buildFilterChip(
-                        label: 'Zone',
-                        selectedValue: _selectedZone,
-                        options: _optionsFrom(
-                          (maraude) => maraude.location,
-                        ),
-                        onSelected: (value) {
-                          setState(() {
-                            _selectedZone = value;
-                          });
-                        },
-                      ),
-                      _buildFilterChip(
-                        label: 'Type',
-                        selectedValue: _selectedType,
-                        options: _optionsFrom(
-                          (maraude) => maraude.distributionType,
-                        ),
-                        onSelected: (value) {
-                          setState(() {
-                            _selectedType = value;
-                          });
-                        },
-                      ),
-                    ],
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      const spacing = 12.0;
+                      final hasTwoColumns = constraints.maxWidth >= 520;
+                      final dateFieldWidth =
+                          (constraints.maxWidth - spacing) / 2;
+                      final fieldWidth = hasTwoColumns
+                          ? dateFieldWidth
+                          : constraints.maxWidth;
+
+                      return Column(
+                        children: [
+                          Row(
+                            children: [
+                              _buildDateFilterField(
+                                label: 'Date debut',
+                                selectedDate: _selectedStartDate,
+                                width: dateFieldWidth,
+                                onTap: _pickStartDate,
+                                onClear: () {
+                                  setState(() {
+                                    _selectedStartDate = null;
+                                  });
+                                },
+                              ),
+                              const SizedBox(width: spacing),
+                              _buildDateFilterField(
+                                label: 'Date fin',
+                                selectedDate: _selectedEndDate,
+                                width: dateFieldWidth,
+                                onTap: _pickEndDate,
+                                onClear: () {
+                                  setState(() {
+                                    _selectedEndDate = null;
+                                  });
+                                },
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          Wrap(
+                            spacing: spacing,
+                            runSpacing: 12,
+                            children: [
+                              _buildFilterField(
+                                label: 'Association',
+                                selectedValue: _selectedAssociation,
+                                options: _optionsFrom(
+                                  (maraude) => maraude.associationName,
+                                ),
+                                width: fieldWidth,
+                                onSelected: (value) {
+                                  setState(() {
+                                    _selectedAssociation = value;
+                                  });
+                                },
+                              ),
+                              _buildFilterField(
+                                label: 'Zone',
+                                selectedValue: _selectedZone,
+                                options: _optionsFrom(_displayLocationLabel),
+                                width: fieldWidth,
+                                onSelected: (value) {
+                                  setState(() {
+                                    _selectedZone = value;
+                                  });
+                                },
+                              ),
+                            ],
+                          ),
+                        ],
+                      );
+                    },
                   ),
                 ],
               ),
             ),
             const SizedBox(height: 16),
             Expanded(
-              child: filteredMaraudes.isEmpty
-                  ? Center(
-                      child: Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(24),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: const Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.history_toggle_off,
-                              size: 38,
-                              color: AppTheme.primaryColor,
-                            ),
-                            SizedBox(height: 12),
-                            Text(
-                              'Aucune maraude ne correspond aux filtres.',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                color: AppTheme.textSecondaryColor,
-                                height: 1.5,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
+              child: _isLoading
+                  ? const Center(
+                      child: CircularProgressIndicator(),
                     )
-                  : ListView.separated(
-                      itemCount: filteredMaraudes.length,
-                      separatorBuilder: (_, __) => const SizedBox(height: 12),
-                      itemBuilder: (context, index) {
-                        final maraude = filteredMaraudes[index];
-                        return _buildHistoryCard(maraude);
-                      },
-                    ),
+                  : _loadError != null
+                      ? _buildErrorState()
+                      : filteredMaraudes.isEmpty
+                          ? Center(
+                              child: Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.all(24),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: const Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      Icons.history_toggle_off,
+                                      size: 38,
+                                      color: AppTheme.primaryColor,
+                                    ),
+                                    SizedBox(height: 12),
+                                    Text(
+                                      'Aucune maraude ne correspond aux filtres.',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        color: AppTheme.textSecondaryColor,
+                                        height: 1.5,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            )
+                          : ListView.separated(
+                              itemCount: filteredMaraudes.length,
+                              separatorBuilder: (_, __) =>
+                                  const SizedBox(height: 12),
+                              itemBuilder: (context, index) {
+                                final maraude = filteredMaraudes[index];
+                                return _buildHistoryCard(maraude);
+                              },
+                            ),
             ),
           ],
         ),

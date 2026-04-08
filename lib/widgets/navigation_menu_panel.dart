@@ -186,25 +186,7 @@ class _NavigationPanelAction extends StatelessWidget {
                   borderRadius: BorderRadius.circular(999),
                 ),
               ),
-              const SizedBox(width: 12),
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: Colors.transparent,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: isActive
-                        ? Colors.white
-                        : Colors.white.withOpacity(0.35),
-                  ),
-                ),
-                child: Icon(
-                  item.icon,
-                  color: Colors.white,
-                ),
-              ),
-              const SizedBox(width: 14),
+              const SizedBox(width: 16),
               Expanded(
                 child: Text(
                   item.label,
@@ -214,10 +196,6 @@ class _NavigationPanelAction extends StatelessWidget {
                     color: Colors.white,
                   ),
                 ),
-              ),
-              Icon(
-                Icons.chevron_right,
-                color: Colors.white,
               ),
             ],
           ),

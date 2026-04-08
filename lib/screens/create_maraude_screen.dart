@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 
 import '../config/current_session.dart';
 import '../config/theme.dart';
+import '../models/maraude.dart';
+import '../repositories/app_repositories.dart';
+import '../services/auth_service.dart';
 import 'map_address_picker_screen.dart';
 
 class CreateMaraudeScreen extends StatefulWidget {
@@ -21,14 +24,17 @@ class CreateMaraudeScreen extends StatefulWidget {
 class _CreateMaraudeScreenState extends State<CreateMaraudeScreen> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _associationController;
+  final _placeNameController = TextEditingController();
   final _estimatedPlatesController = TextEditingController(text: '100');
   final _commentController = TextEditingController();
+  final _repository = AppRepositories.maraudes;
 
   DateTime? _selectedDate;
   TimeOfDay? _startTime;
   TimeOfDay? _endTime;
   PickedMapLocation? _pickedMapLocation;
   bool _showValidationErrors = false;
+  bool _isSaving = false;
 
   @override
   void initState() {
@@ -41,6 +47,7 @@ class _CreateMaraudeScreenState extends State<CreateMaraudeScreen> {
   @override
   void dispose() {
     _associationController.dispose();
+    _placeNameController.dispose();
     _estimatedPlatesController.dispose();
     _commentController.dispose();
     super.dispose();
@@ -107,7 +114,11 @@ class _CreateMaraudeScreenState extends State<CreateMaraudeScreen> {
     });
   }
 
-  void _saveForm() {
+  Future<void> _saveForm() async {
+    if (_isSaving) {
+      return;
+    }
+
     setState(() {
       _showValidationErrors = true;
     });
@@ -122,7 +133,59 @@ class _CreateMaraudeScreenState extends State<CreateMaraudeScreen> {
       return;
     }
 
-    Navigator.of(context).pop(true);
+    final selectedDate = _selectedDate!;
+    final pickedMapLocation = _pickedMapLocation!;
+    final placeName = _placeNameController.text.trim();
+    final newMaraude = Maraude(
+      id: '',
+      associationName: _associationController.text.trim(),
+      location: placeName,
+      address: 'Point selectionne sur la carte',
+      date: selectedDate,
+      startTime: _formatMaraudeTime(_startTime!),
+      endTime: _formatMaraudeTime(_endTime!),
+      estimatedPlates: int.parse(_estimatedPlatesController.text.trim()),
+      distributionType: 'Standard',
+      comment: _commentController.text.trim(),
+      latitude: pickedMapLocation.point.latitude,
+      longitude: pickedMapLocation.point.longitude,
+      status: _statusForDate(selectedDate),
+    );
+
+    setState(() {
+      _isSaving = true;
+    });
+
+    try {
+      final savedMaraude = await _repository.create(
+        newMaraude,
+        createdBy: AuthService.instance.currentUser?.id,
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      Navigator.of(context).pop(savedMaraude);
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Enregistrement impossible pour le moment.'),
+        ),
+      );
+    } finally {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _isSaving = false;
+      });
+    }
   }
 
   String _formatDate(DateTime date) {
@@ -136,6 +199,22 @@ class _CreateMaraudeScreenState extends State<CreateMaraudeScreen> {
     final hour = time.hour.toString().padLeft(2, '0');
     final minute = time.minute.toString().padLeft(2, '0');
     return '$hour:$minute';
+  }
+
+  String _formatMaraudeTime(TimeOfDay time) {
+    if (time.minute == 0) {
+      return '${time.hour}h';
+    }
+
+    return '${time.hour}h${time.minute.toString().padLeft(2, '0')}';
+  }
+
+  MaraudeStatus _statusForDate(DateTime date) {
+    final today = DateUtils.dateOnly(DateTime.now());
+    final selectedDay = DateUtils.dateOnly(date);
+    return selectedDay.isBefore(today)
+        ? MaraudeStatus.completed
+        : MaraudeStatus.planned;
   }
 
   int _timeInMinutes(TimeOfDay time) => time.hour * 60 + time.minute;
@@ -238,7 +317,9 @@ class _CreateMaraudeScreenState extends State<CreateMaraudeScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                _pickedMapLocation?.label ?? 'Aucun point selectionne.',
+                _pickedMapLocation == null
+                    ? 'Aucun point selectionne.'
+                    : 'Point selectionne sur la carte.',
                 style: const TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
@@ -247,12 +328,28 @@ class _CreateMaraudeScreenState extends State<CreateMaraudeScreen> {
               ),
               const SizedBox(height: 6),
               Text(
-                _pickedMapLocation?.coordinatesLabel ??
-                    'Touchez la carte pour choisir l\'emplacement.',
+                _pickedMapLocation == null
+                    ? 'Touchez la carte pour choisir l\'emplacement.'
+                    : 'Le point exact est enregistre sur la carte.',
                 style: const TextStyle(
                   fontSize: 13,
                   color: AppTheme.textSecondaryColor,
                 ),
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _placeNameController,
+                decoration: const InputDecoration(
+                  labelText: 'Nom de l\'endroit *',
+                  hintText: 'Ex : Gare du Nord / Rue de la Republique',
+                ),
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) {
+                    return 'Nommez l\'endroit selectionne.';
+                  }
+
+                  return null;
+                },
               ),
               const SizedBox(height: 16),
               SizedBox(
@@ -420,7 +517,7 @@ class _CreateMaraudeScreenState extends State<CreateMaraudeScreen> {
                   children: [
                     Expanded(
                       child: OutlinedButton(
-                        onPressed: () => Navigator.of(context).pop(false),
+                        onPressed: () => Navigator.of(context).pop(),
                         style: OutlinedButton.styleFrom(
                           foregroundColor: AppTheme.primaryColor,
                           side: const BorderSide(color: AppTheme.primaryColor),
@@ -436,7 +533,18 @@ class _CreateMaraudeScreenState extends State<CreateMaraudeScreen> {
                         style: ElevatedButton.styleFrom(
                           minimumSize: const Size.fromHeight(52),
                         ),
-                        child: const Text('Enregistrer'),
+                        child: _isSaving
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    Colors.white,
+                                  ),
+                                ),
+                              )
+                            : const Text('Enregistrer'),
                       ),
                     ),
                   ],

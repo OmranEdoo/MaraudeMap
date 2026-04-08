@@ -8,11 +8,13 @@ class DateSelectorBar extends StatelessWidget {
     required this.selectedDate,
     required this.onLeftPressed,
     required this.onRightPressed,
+    required this.onDatePressed,
   });
 
   final DateTime selectedDate;
   final VoidCallback onLeftPressed;
   final VoidCallback onRightPressed;
+  final VoidCallback onDatePressed;
 
   int _selectedDateOffsetFromToday() {
     final today = DateUtils.dateOnly(DateTime.now());
@@ -63,24 +65,38 @@ class DateSelectorBar extends StatelessWidget {
             icon: const Icon(Icons.chevron_left),
             onPressed: onLeftPressed,
           ),
-          Column(
-            children: [
-              Text(
-                _selectedDateLabel(),
-                style: TextStyle(
-                  fontSize: 14,
-                  color: textColor,
+          Material(
+            color: Colors.transparent,
+            borderRadius: BorderRadius.circular(18),
+            child: InkWell(
+              onTap: onDatePressed,
+              borderRadius: BorderRadius.circular(18),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
+                ),
+                child: Column(
+                  children: [
+                    Text(
+                      _selectedDateLabel(),
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: textColor,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      _formattedSelectedDate(),
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: textColor,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 4),
-              Text(
-                _formattedSelectedDate(),
-                style: TextStyle(
-                  fontSize: 12,
-                  color: textColor,
-                ),
-              ),
-            ],
+            ),
           ),
           IconButton(
             icon: const Icon(Icons.chevron_right),

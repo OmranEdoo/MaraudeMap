@@ -4,7 +4,9 @@ import 'package:latlong2/latlong.dart';
 
 import '../config/current_session.dart';
 import '../config/theme.dart';
+import '../config/view_selected_date.dart';
 import '../models/maraude.dart';
+import '../repositories/app_repositories.dart';
 import '../screens/create_maraude_screen.dart';
 import '../screens/edit_maraude_screen.dart';
 import '../widgets/bottom_bar_action.dart';
@@ -13,7 +15,14 @@ import '../widgets/header_logo.dart';
 import '../widgets/navigation_menu_panel.dart';
 
 class MapScreen extends StatefulWidget {
-  const MapScreen({super.key});
+  const MapScreen({
+    super.key,
+    this.initialDate,
+    this.initialFocusMaraudeId,
+  });
+
+  final DateTime? initialDate;
+  final String? initialFocusMaraudeId;
 
   @override
   State<MapScreen> createState() => _MapScreenState();
@@ -26,40 +35,27 @@ class _MapScreenState extends State<MapScreen> {
   static const double _maxMapZoom = 18;
 
   final MapController _mapController = MapController();
-  DateTime selectedDate = DateTime.now();
+  final _repository = AppRepositories.maraudes;
+
+  late DateTime selectedDate;
   String selectedFilterAssociation = 'Tous';
   bool isAssociationFilterVisible = false;
+  bool _isLoading = true;
+  String? _loadError;
+  String? _pendingFocusMaraudeId;
 
-  List<Maraude> maraudes = [
-    Maraude(
-      id: '1',
-      associationName: 'TAYBA',
-      location: 'Stallingrad',
-      address: '75 001 Paris',
-      date: DateTime.now(),
-      startTime: '19h',
-      endTime: '20h',
-      estimatedPlates: 100,
-      distributionType: 'Repas',
-      latitude: 48.8835,
-      longitude: 2.3619,
-      status: MaraudeStatus.planned,
-    ),
-    Maraude(
-      id: '2',
-      associationName: 'EILMY',
-      location: 'Pont-Marie',
-      address: '75 004 Paris',
-      date: DateTime.now(),
-      startTime: '20h30',
-      endTime: '21h',
-      estimatedPlates: 120,
-      distributionType: 'Distribution',
-      latitude: 48.8530,
-      longitude: 2.3610,
-      status: MaraudeStatus.completed,
-    ),
-  ];
+  List<Maraude> maraudes = [];
+
+  @override
+  void initState() {
+    super.initState();
+    selectedDate = DateUtils.dateOnly(
+      widget.initialDate ?? ViewSelectedDate.selectedDate,
+    );
+    ViewSelectedDate.update(selectedDate);
+    _pendingFocusMaraudeId = widget.initialFocusMaraudeId;
+    _loadMaraudesForSelectedDate();
+  }
 
   @override
   void dispose() {
@@ -71,20 +67,117 @@ class _MapScreenState extends State<MapScreen> {
     setState(() {
       selectedDate = selectedDate.add(const Duration(days: 1));
     });
+    ViewSelectedDate.update(selectedDate);
+    _loadMaraudesForSelectedDate();
   }
 
   void _goToPreviousDay() {
     setState(() {
       selectedDate = selectedDate.subtract(const Duration(days: 1));
     });
+    ViewSelectedDate.update(selectedDate);
+    _loadMaraudesForSelectedDate();
+  }
+
+  Future<void> _pickDateFromBar() async {
+    final pickedDate = await showDatePicker(
+      context: context,
+      initialDate: selectedDate,
+      firstDate: DateTime.now().subtract(const Duration(days: 365 * 2)),
+      lastDate: DateTime.now().add(const Duration(days: 365 * 2)),
+    );
+
+    if (pickedDate == null || !mounted) {
+      return;
+    }
+
+    setState(() {
+      selectedDate = DateUtils.dateOnly(pickedDate);
+    });
+    ViewSelectedDate.update(selectedDate);
+    await _loadMaraudesForSelectedDate();
   }
 
   void _goToListScreen() {
     Navigator.pushReplacementNamed(context, '/list');
   }
 
+  Future<void> _loadMaraudesForSelectedDate() async {
+    setState(() {
+      _isLoading = true;
+      _loadError = null;
+    });
+
+    try {
+      final loadedMaraudes = await _repository.listForDate(selectedDate);
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        maraudes = loadedMaraudes;
+
+        final hasAssociation = selectedFilterAssociation == 'Tous' ||
+            loadedMaraudes.any(
+              (maraude) => maraude.associationName == selectedFilterAssociation,
+            );
+        if (!hasAssociation) {
+          selectedFilterAssociation = 'Tous';
+        }
+      });
+
+      _focusInitialMaraudeIfNeeded(loadedMaraudes);
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _loadError = 'Impossible de charger les maraudes.';
+      });
+    } finally {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
+  void _focusInitialMaraudeIfNeeded(List<Maraude> loadedMaraudes) {
+    final focusMaraudeId = _pendingFocusMaraudeId;
+    if (focusMaraudeId == null || focusMaraudeId.isEmpty) {
+      return;
+    }
+
+    Maraude? focusedMaraude;
+    for (final maraude in loadedMaraudes) {
+      if (maraude.id == focusMaraudeId) {
+        focusedMaraude = maraude;
+        break;
+      }
+    }
+
+    if (focusedMaraude == null) {
+      return;
+    }
+
+    _pendingFocusMaraudeId = null;
+    final point = LatLng(focusedMaraude.latitude, focusedMaraude.longitude);
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+
+      _mapController.move(point, 15.2);
+    });
+  }
+
   Future<void> _openCreateMaraudeScreen() async {
-    final isSaved = await Navigator.of(context).push<bool>(
+    final createdMaraude = await Navigator.of(context).push<Maraude>(
       MaterialPageRoute(
         builder: (context) => CreateMaraudeScreen(
           initialAssociation: CurrentSession.associationName,
@@ -93,13 +186,21 @@ class _MapScreenState extends State<MapScreen> {
       ),
     );
 
-    if (isSaved == true && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Maraude enregistree.'),
-        ),
-      );
+    if (createdMaraude == null || !mounted) {
+      return;
     }
+
+    await _loadMaraudesForSelectedDate();
+
+    if (!mounted) {
+      return;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Maraude enregistree.'),
+      ),
+    );
   }
 
   Future<void> _openEditMaraudeScreen(Maraude maraude) async {
@@ -118,12 +219,11 @@ class _MapScreenState extends State<MapScreen> {
       return;
     }
 
-    setState(() {
-      final index = maraudes.indexWhere((item) => item.id == updatedMaraude.id);
-      if (index != -1) {
-        maraudes[index] = updatedMaraude;
-      }
-    });
+    await _loadMaraudesForSelectedDate();
+
+    if (!mounted) {
+      return;
+    }
 
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
@@ -175,16 +275,7 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   Color _markerColorFor(Maraude maraude) {
-    switch (maraude.status) {
-      case MaraudeStatus.completed:
-        return AppTheme.successColor;
-      case MaraudeStatus.ongoing:
-        return AppTheme.dangerColor;
-      case MaraudeStatus.planned:
-        return maraude.estimatedPlates >= 100
-            ? AppTheme.dangerColor
-            : AppTheme.warningColor;
-    }
+    return AppTheme.primaryColor;
   }
 
   List<String> _associationOptions() {
@@ -412,6 +503,39 @@ class _MapScreenState extends State<MapScreen> {
     );
   }
 
+  Widget _buildLoadStateCard({
+    required String message,
+    required VoidCallback onRetry,
+  }) {
+    return Center(
+      child: Container(
+        margin: const EdgeInsets.all(24),
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: AppTheme.textSecondaryColor,
+              ),
+            ),
+            const SizedBox(height: 12),
+            ElevatedButton(
+              onPressed: onRetry,
+              child: const Text('Reessayer'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final canCreateMaraude = _canCreateMaraudeForSelectedDate();
@@ -438,6 +562,7 @@ class _MapScreenState extends State<MapScreen> {
             selectedDate: selectedDate,
             onLeftPressed: _goToPreviousDay,
             onRightPressed: _goToNextDay,
+            onDatePressed: _pickDateFromBar,
           ),
           Expanded(
             child: Stack(
@@ -470,6 +595,15 @@ class _MapScreenState extends State<MapScreen> {
                     ),
                   ],
                 ),
+                if (_isLoading)
+                  const Center(
+                    child: CircularProgressIndicator(),
+                  ),
+                if (_loadError != null)
+                  _buildLoadStateCard(
+                    message: _loadError!,
+                    onRetry: _loadMaraudesForSelectedDate,
+                  ),
                 Positioned(
                   top: 16,
                   left: 16,
@@ -492,7 +626,9 @@ class _MapScreenState extends State<MapScreen> {
                     ),
                     child: ElevatedButton.icon(
                       onPressed:
-                          canCreateMaraude ? _openCreateMaraudeScreen : null,
+                          canCreateMaraude && !_isLoading && _loadError == null
+                              ? _openCreateMaraudeScreen
+                              : null,
                       icon: const Icon(Icons.add_rounded, size: 28),
                       label: const Text('Ajouter une maraude'),
                       style: ElevatedButton.styleFrom(

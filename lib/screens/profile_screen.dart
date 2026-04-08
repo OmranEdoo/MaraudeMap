@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../config/current_session.dart';
 import '../config/theme.dart';
+import '../services/auth_service.dart';
 import '../widgets/header_logo.dart';
 import '../widgets/navigation_menu_panel.dart';
 
@@ -162,7 +163,13 @@ class ProfileScreen extends StatelessWidget {
                         ),
                         const SizedBox(height: 28),
                         ElevatedButton.icon(
-                          onPressed: () {
+                          onPressed: () async {
+                            await AuthService.instance.signOut();
+                            CurrentSession.resetToDemo();
+                            if (!context.mounted) {
+                              return;
+                            }
+
                             Navigator.pushNamedAndRemoveUntil(
                               context,
                               '/authenticate',
