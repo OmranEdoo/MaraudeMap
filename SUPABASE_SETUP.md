@@ -56,3 +56,49 @@ flutter run `
 ## 6. Prochaine etape recommandee
 
 La suite logique est de remplacer les listes en dur de la carte et de la liste par `SupabaseMaraudeRepository`, puis de brancher la creation et la modification sur la table `maraudes`.
+
+## 7. Build Android de test interne
+
+Le package Android est prepare pour `fr.tayba.maraudemap`.
+
+### Creer le keystore de publication
+
+```powershell
+keytool -genkeypair -v `
+  -keystore android\\upload-keystore.jks `
+  -alias upload `
+  -keyalg RSA `
+  -keysize 2048 `
+  -validity 10000
+```
+
+### Creer `android/key.properties`
+
+Tu peux partir de [android/key.properties.example](android/key.properties.example) et creer un fichier `android/key.properties` :
+
+```properties
+storePassword=TON_MOT_DE_PASSE_KEYSTORE
+keyPassword=TON_MOT_DE_PASSE_CLE
+keyAlias=upload
+storeFile=upload-keystore.jks
+```
+
+### Generer le bundle Android pour Google Play
+
+```powershell
+flutter build appbundle --release `
+  --dart-define=SUPABASE_URL=https://gmprlorpsxoljtedmjbn.supabase.co `
+  --dart-define=SUPABASE_ANON_KEY=sb_publishable_zqYHgLmDRW-2_HfWNvokpg_mF_C2WAR
+```
+
+Le fichier a envoyer sur Google Play sera :
+
+`build\app\outputs\bundle\release\app-release.aab`
+
+### Envoyer sur Google Play en test interne
+
+1. Cree l'application `fr.tayba.maraudemap` dans Play Console.
+2. Va dans `Testing > Internal testing`.
+3. Ajoute tes testeurs.
+4. Uploade `app-release.aab`.
+5. Publie la release de test, puis partage le lien d'invitation.
