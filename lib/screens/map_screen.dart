@@ -9,9 +9,9 @@ import '../models/maraude.dart';
 import '../repositories/app_repositories.dart';
 import '../screens/create_maraude_screen.dart';
 import '../screens/edit_maraude_screen.dart';
+import '../widgets/app_help_button.dart';
 import '../widgets/bottom_bar_action.dart';
 import '../widgets/date_selector_bar.dart';
-import '../widgets/header_logo.dart';
 import '../widgets/navigation_menu_panel.dart';
 
 class MapScreen extends StatefulWidget {
@@ -36,6 +36,11 @@ class _MapScreenState extends State<MapScreen> {
 
   final MapController _mapController = MapController();
   final _repository = AppRepositories.maraudes;
+  final GlobalKey _menuHelpKey = GlobalKey();
+  final GlobalKey _dateHelpKey = GlobalKey();
+  final GlobalKey _createHelpKey = GlobalKey();
+  final GlobalKey _filterHelpKey = GlobalKey();
+  final GlobalKey _listHelpKey = GlobalKey();
 
   late DateTime selectedDate;
   String selectedFilterAssociation = 'Tous';
@@ -539,11 +544,62 @@ class _MapScreenState extends State<MapScreen> {
   @override
   Widget build(BuildContext context) {
     final canCreateMaraude = _canCreateMaraudeForSelectedDate();
+    final helpTargets = [
+      AppHelpTarget(
+        targetKey: _menuHelpKey,
+        title: 'Menu',
+        description:
+            'Ouvrez ici la navigation principale pour passer a la carte, a la liste, a l historique ou au profil.',
+        onTargetTap: () => showNavigationMenuPanel(
+          context,
+          currentRoute: '/home',
+        ),
+        closeAfterTap: true,
+      ),
+      AppHelpTarget(
+        targetKey: _dateHelpKey,
+        title: 'Date',
+        description:
+            'Changez de jour avec les fleches ou touchez la date pour choisir directement un jour dans le calendrier.',
+        onTargetTap: () {
+          _pickDateFromBar();
+        },
+        closeAfterTap: true,
+      ),
+      AppHelpTarget(
+        targetKey: _createHelpKey,
+        title: 'Ajouter une maraude',
+        description:
+            'Ce bouton permet d annoncer une nouvelle maraude pour le jour selectionne. Il est desactive pour une date passee.',
+        placement: AppHelpPlacement.above,
+        onTargetTap: canCreateMaraude ? _openCreateMaraudeScreen : null,
+        closeAfterTap: canCreateMaraude,
+      ),
+      AppHelpTarget(
+        targetKey: _filterHelpKey,
+        title: 'Filtre',
+        description:
+            'Affichez ici le filtre d association pour ne voir que certaines maraudes sur la carte.',
+        placement: AppHelpPlacement.above,
+        onTargetTap: _toggleAssociationFilterBar,
+        closeAfterTap: true,
+      ),
+      AppHelpTarget(
+        targetKey: _listHelpKey,
+        title: 'Liste',
+        description:
+            'Passez en vue liste tout en conservant la meme date selectionnee.',
+        placement: AppHelpPlacement.above,
+        onTargetTap: _goToListScreen,
+        closeAfterTap: true,
+      ),
+    ];
 
     return Scaffold(
       appBar: AppBar(
         elevation: 0,
         leading: IconButton(
+          key: _menuHelpKey,
           icon: const Icon(Icons.menu),
           onPressed: () => showNavigationMenuPanel(
             context,
@@ -553,12 +609,13 @@ class _MapScreenState extends State<MapScreen> {
         title: const Text('MaraudeMap'),
         centerTitle: true,
         actions: [
-          const HeaderLogo(),
+          AppHelpButton(targets: helpTargets),
         ],
       ),
       body: Column(
         children: [
           DateSelectorBar(
+            key: _dateHelpKey,
             selectedDate: selectedDate,
             onLeftPressed: _goToPreviousDay,
             onRightPressed: _goToNextDay,
@@ -625,6 +682,7 @@ class _MapScreenState extends State<MapScreen> {
                       ],
                     ),
                     child: ElevatedButton.icon(
+                      key: _createHelpKey,
                       onPressed:
                           canCreateMaraude && !_isLoading && _loadError == null
                               ? _openCreateMaraudeScreen
@@ -676,6 +734,7 @@ class _MapScreenState extends State<MapScreen> {
               children: [
                 Expanded(
                   child: BottomBarAction(
+                    key: _filterHelpKey,
                     icon: Icons.tune,
                     label: 'Filtre',
                     onTap: _toggleAssociationFilterBar,
@@ -684,6 +743,7 @@ class _MapScreenState extends State<MapScreen> {
                 const SizedBox(width: 12),
                 Expanded(
                   child: BottomBarAction(
+                    key: _listHelpKey,
                     icon: Icons.list,
                     label: 'Liste',
                     onTap: _goToListScreen,

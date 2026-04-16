@@ -8,9 +8,9 @@ import '../repositories/app_repositories.dart';
 import '../screens/create_maraude_screen.dart';
 import '../screens/edit_maraude_screen.dart';
 import '../screens/map_screen.dart';
+import '../widgets/app_help_button.dart';
 import '../widgets/bottom_bar_action.dart';
 import '../widgets/date_selector_bar.dart';
-import '../widgets/header_logo.dart';
 import '../widgets/navigation_menu_panel.dart';
 
 class ListScreen extends StatefulWidget {
@@ -22,6 +22,10 @@ class ListScreen extends StatefulWidget {
 
 class _ListScreenState extends State<ListScreen> {
   final _repository = AppRepositories.maraudes;
+  final GlobalKey _menuHelpKey = GlobalKey();
+  final GlobalKey _dateHelpKey = GlobalKey();
+  final GlobalKey _filterHelpKey = GlobalKey();
+  final GlobalKey _mapHelpKey = GlobalKey();
 
   String selectedFilterAssociation = 'Tous';
   String selectedFilterAddress = 'Tous';
@@ -378,11 +382,53 @@ class _ListScreenState extends State<ListScreen> {
   @override
   Widget build(BuildContext context) {
     final filteredMaraudes = getFilteredMaraudes();
+    final helpTargets = [
+      AppHelpTarget(
+        targetKey: _menuHelpKey,
+        title: 'Menu',
+        description:
+            'Accedez ici aux autres ecrans de l application, comme la carte, l historique ou le profil.',
+        onTargetTap: () => showNavigationMenuPanel(
+          context,
+          currentRoute: '/list',
+        ),
+        closeAfterTap: true,
+      ),
+      AppHelpTarget(
+        targetKey: _dateHelpKey,
+        title: 'Date',
+        description:
+            'La liste affiche les maraudes du jour selectionne. Touchez la date pour ouvrir le calendrier.',
+        onTargetTap: () {
+          _pickDateFromBar();
+        },
+        closeAfterTap: true,
+      ),
+      AppHelpTarget(
+        targetKey: _filterHelpKey,
+        title: 'Filtre',
+        description:
+            'Filtrez la liste par association ou par zone pour retrouver plus vite une maraude.',
+        placement: AppHelpPlacement.above,
+        onTargetTap: _toggleFilterBar,
+        closeAfterTap: true,
+      ),
+      AppHelpTarget(
+        targetKey: _mapHelpKey,
+        title: 'Carte',
+        description:
+            'Revenez a la vue carte tout en gardant la meme date selectionnee.',
+        placement: AppHelpPlacement.above,
+        onTargetTap: _goToMapScreen,
+        closeAfterTap: true,
+      ),
+    ];
 
     return Scaffold(
       appBar: AppBar(
         elevation: 0,
         leading: IconButton(
+          key: _menuHelpKey,
           icon: const Icon(Icons.menu),
           onPressed: () => showNavigationMenuPanel(
             context,
@@ -392,12 +438,13 @@ class _ListScreenState extends State<ListScreen> {
         title: const Text('MaraudeMap'),
         centerTitle: true,
         actions: [
-          const HeaderLogo(),
+          AppHelpButton(targets: helpTargets),
         ],
       ),
       body: Column(
         children: [
           DateSelectorBar(
+            key: _dateHelpKey,
             selectedDate: selectedDate,
             onLeftPressed: _goToPreviousDay,
             onRightPressed: _goToNextDay,
@@ -492,6 +539,7 @@ class _ListScreenState extends State<ListScreen> {
               children: [
                 Expanded(
                   child: BottomBarAction(
+                    key: _filterHelpKey,
                     icon: Icons.tune,
                     label: 'Filtre',
                     onTap: _toggleFilterBar,
@@ -500,6 +548,7 @@ class _ListScreenState extends State<ListScreen> {
                 const SizedBox(width: 12),
                 Expanded(
                   child: BottomBarAction(
+                    key: _mapHelpKey,
                     icon: Icons.location_on,
                     label: 'Carte',
                     onTap: _goToMapScreen,

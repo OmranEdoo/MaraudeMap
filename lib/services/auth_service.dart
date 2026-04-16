@@ -31,6 +31,42 @@ class AuthService {
     );
   }
 
+  Future<AuthResponse> signUp({
+    required String email,
+    required String password,
+    required String fullName,
+    required String associationName,
+  }) async {
+    if (!isConfigured) {
+      throw AuthException(
+        'Supabase n\'est pas encore configure pour cette application.',
+      );
+    }
+
+    return _client.auth.signUp(
+      email: email,
+      password: password,
+      emailRedirectTo: SupabaseConfig.emailRedirectTo,
+      data: {
+        'full_name': fullName,
+        'association_name': associationName,
+      },
+    );
+  }
+
+  Future<void> resetPasswordForEmail(String email) async {
+    if (!isConfigured) {
+      throw AuthException(
+        'Supabase n\'est pas encore configure pour cette application.',
+      );
+    }
+
+    await _client.auth.resetPasswordForEmail(
+      email,
+      redirectTo: SupabaseConfig.emailRedirectTo,
+    );
+  }
+
   Future<void> signOut() async {
     if (!isConfigured) {
       return;

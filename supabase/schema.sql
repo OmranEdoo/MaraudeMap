@@ -29,6 +29,9 @@ create table if not exists public.maraudes (
   updated_at timestamptz not null default timezone('utc', now())
 );
 
+alter table public.maraudes
+add column if not exists is_weekly boolean not null default false;
+
 create or replace function public.set_updated_at()
 returns trigger
 language plpgsql

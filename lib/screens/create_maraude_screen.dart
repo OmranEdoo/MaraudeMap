@@ -33,6 +33,7 @@ class _CreateMaraudeScreenState extends State<CreateMaraudeScreen> {
   TimeOfDay? _startTime;
   TimeOfDay? _endTime;
   PickedMapLocation? _pickedMapLocation;
+  bool _isWeekly = false;
   bool _showValidationErrors = false;
   bool _isSaving = false;
 
@@ -147,6 +148,7 @@ class _CreateMaraudeScreenState extends State<CreateMaraudeScreen> {
       estimatedPlates: int.parse(_estimatedPlatesController.text.trim()),
       distributionType: 'Standard',
       comment: _commentController.text.trim(),
+      isWeekly: _isWeekly,
       latitude: pickedMapLocation.point.latitude,
       longitude: pickedMapLocation.point.longitude,
       status: _statusForDate(selectedDate),
@@ -386,6 +388,43 @@ class _CreateMaraudeScreenState extends State<CreateMaraudeScreen> {
     );
   }
 
+  Widget _buildWeeklyCheckbox() {
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppTheme.dividerColor),
+      ),
+      child: CheckboxListTile(
+        value: _isWeekly,
+        onChanged: (value) {
+          setState(() {
+            _isWeekly = value ?? false;
+          });
+        },
+        controlAffinity: ListTileControlAffinity.leading,
+        activeColor: AppTheme.primaryColor,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+        title: const Text(
+          'Maraude hebdomadaire',
+          style: TextStyle(
+            fontSize: 15,
+            fontWeight: FontWeight.w600,
+            color: AppTheme.textPrimaryColor,
+          ),
+        ),
+        subtitle: const Text(
+          'Signale que cette maraude revient chaque semaine.',
+          style: TextStyle(
+            fontSize: 13,
+            color: AppTheme.textSecondaryColor,
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -421,8 +460,9 @@ class _CreateMaraudeScreenState extends State<CreateMaraudeScreen> {
                     'Annoncez une maraude avec les informations principales ',
                     style: TextStyle(
                       fontSize: 14,
-                      color: AppTheme.textSecondaryColor,
+                      color: AppTheme.textPrimaryColor,
                       height: 1.5,
+                      fontWeight: FontWeight.w500,
                     ),
                   ),
                 ),
@@ -512,6 +552,8 @@ class _CreateMaraudeScreenState extends State<CreateMaraudeScreen> {
                     alignLabelWithHint: true,
                   ),
                 ),
+                const SizedBox(height: 20),
+                _buildWeeklyCheckbox(),
                 const SizedBox(height: 28),
                 Row(
                   children: [

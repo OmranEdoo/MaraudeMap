@@ -31,6 +31,7 @@ class _EditMaraudeScreenState extends State<EditMaraudeScreen> {
   late TimeOfDay _startTime;
   late TimeOfDay _endTime;
   late PickedMapLocation _pickedMapLocation;
+  bool _isWeekly = false;
   bool _showValidationErrors = false;
   bool _isSaving = false;
 
@@ -65,6 +66,7 @@ class _EditMaraudeScreenState extends State<EditMaraudeScreen> {
     _selectedDate = widget.maraude.date;
     _startTime = _parseTime(widget.maraude.startTime);
     _endTime = _parseTime(widget.maraude.endTime);
+    _isWeekly = widget.maraude.isWeekly;
     _pickedMapLocation = PickedMapLocation(
       point: LatLng(widget.maraude.latitude, widget.maraude.longitude),
       label: widget.maraude.address,
@@ -159,6 +161,7 @@ class _EditMaraudeScreenState extends State<EditMaraudeScreen> {
       address: 'Point selectionne sur la carte',
       estimatedPlates: int.parse(_estimatedPlatesController.text.trim()),
       comment: _commentController.text.trim(),
+      isWeekly: _isWeekly,
       latitude: _pickedMapLocation.point.latitude,
       longitude: _pickedMapLocation.point.longitude,
     );
@@ -381,6 +384,43 @@ class _EditMaraudeScreenState extends State<EditMaraudeScreen> {
     );
   }
 
+  Widget _buildWeeklyCheckbox() {
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppTheme.dividerColor),
+      ),
+      child: CheckboxListTile(
+        value: _isWeekly,
+        onChanged: (value) {
+          setState(() {
+            _isWeekly = value ?? false;
+          });
+        },
+        controlAffinity: ListTileControlAffinity.leading,
+        activeColor: AppTheme.primaryColor,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+        title: const Text(
+          'Maraude hebdomadaire',
+          style: TextStyle(
+            fontSize: 15,
+            fontWeight: FontWeight.w600,
+            color: AppTheme.textPrimaryColor,
+          ),
+        ),
+        subtitle: const Text(
+          'Signale que cette maraude revient chaque semaine.',
+          style: TextStyle(
+            fontSize: 13,
+            color: AppTheme.textSecondaryColor,
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (!_canEditCurrentMaraude) {
@@ -474,8 +514,9 @@ class _EditMaraudeScreenState extends State<EditMaraudeScreen> {
                     'Mettez a jour une maraude prevue ou deja effectuee.',
                     style: TextStyle(
                       fontSize: 14,
-                      color: AppTheme.textSecondaryColor,
+                      color: AppTheme.textPrimaryColor,
                       height: 1.5,
+                      fontWeight: FontWeight.w500,
                     ),
                   ),
                 ),
@@ -559,6 +600,8 @@ class _EditMaraudeScreenState extends State<EditMaraudeScreen> {
                     alignLabelWithHint: true,
                   ),
                 ),
+                const SizedBox(height: 20),
+                _buildWeeklyCheckbox(),
                 const SizedBox(height: 28),
                 Row(
                   children: [

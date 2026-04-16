@@ -37,6 +37,16 @@ values (
 
 ## 4. Lancer l'application avec les cles
 
+Avant le premier test d'inscription par email, configure aussi le redirect d'authentification dans Supabase :
+
+1. Ouvre `Authentication > URL Configuration`.
+2. Remplace `Site URL` par `maraudemap://login-callback/` au lieu de `http://localhost:3000`.
+3. Ajoute aussi `maraudemap://login-callback/` dans `Additional Redirect URLs`.
+4. Ouvre `Authentication > Email Templates` et verifie que les templates de confirmation / recovery utilisent bien `{{ .ConfirmationURL }}`. Si un template personnalise utilise `{{ .SiteURL }}`, `localhost:3000` peut continuer d'apparaitre dans les emails.
+5. Si tu avais deja envoye un email d'inscription avant ce reglage, renvoie un nouvel email : les anciens liens qui pointent vers `localhost:3000` ou qui ont expire continueront d'echouer.
+
+Apres une modification du deep link mobile, fais un vrai redemarrage de l'application (`flutter run` ou reinstallation) plutot qu'un simple hot reload.
+
 Utilise des `dart-define` :
 
 ```powershell

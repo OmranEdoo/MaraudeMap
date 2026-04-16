@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../config/theme.dart';
 import '../models/maraude.dart';
 import '../repositories/app_repositories.dart';
-import '../widgets/header_logo.dart';
+import '../widgets/app_help_button.dart';
 import '../widgets/navigation_menu_panel.dart';
 
 class HistoryScreen extends StatefulWidget {
@@ -30,6 +30,9 @@ class _HistoryScreenState extends State<HistoryScreen> {
   ];
 
   final _repository = AppRepositories.maraudes;
+  final GlobalKey _menuHelpKey = GlobalKey();
+  final GlobalKey _filtersHelpKey = GlobalKey();
+  final GlobalKey _listHelpKey = GlobalKey();
 
   List<Maraude> _pastMaraudes = [];
   DateTime? _selectedStartDate;
@@ -574,11 +577,38 @@ class _HistoryScreenState extends State<HistoryScreen> {
   @override
   Widget build(BuildContext context) {
     final filteredMaraudes = _filteredMaraudes();
+    final helpTargets = [
+      AppHelpTarget(
+        targetKey: _menuHelpKey,
+        title: 'Menu',
+        description:
+            'Ouvrez ici la navigation principale pour revenir a la carte, a la liste ou au profil.',
+        onTargetTap: () => showNavigationMenuPanel(
+          context,
+          currentRoute: '/history',
+        ),
+        closeAfterTap: true,
+      ),
+      AppHelpTarget(
+        targetKey: _filtersHelpKey,
+        title: 'Filtres',
+        description:
+            'Filtrez l historique avec une date de debut, une date de fin, puis par association ou par zone.',
+      ),
+      AppHelpTarget(
+        targetKey: _listHelpKey,
+        title: 'Resultats',
+        description:
+            'Les maraudes correspondant a vos filtres s affichent ici dans l historique.',
+        placement: AppHelpPlacement.above,
+      ),
+    ];
 
     return Scaffold(
       appBar: AppBar(
         elevation: 0,
         leading: IconButton(
+          key: _menuHelpKey,
           icon: const Icon(Icons.menu),
           onPressed: () => showNavigationMenuPanel(
             context,
@@ -588,7 +618,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
         title: const Text('Historique'),
         centerTitle: true,
         actions: [
-          const HeaderLogo(),
+          AppHelpButton(targets: helpTargets),
         ],
       ),
       body: Padding(
@@ -596,6 +626,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
         child: Column(
           children: [
             Container(
+              key: _filtersHelpKey,
               width: double.infinity,
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
@@ -700,6 +731,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
             ),
             const SizedBox(height: 16),
             Expanded(
+              key: _listHelpKey,
               child: _isLoading
                   ? const Center(
                       child: CircularProgressIndicator(),

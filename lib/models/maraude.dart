@@ -9,6 +9,7 @@ class Maraude {
   final int estimatedPlates;
   final String distributionType;
   final String comment;
+  final bool isWeekly;
   final double latitude;
   final double longitude;
   final MaraudeStatus status;
@@ -24,6 +25,7 @@ class Maraude {
     required this.estimatedPlates,
     required this.distributionType,
     this.comment = '',
+    this.isWeekly = false,
     required this.latitude,
     required this.longitude,
     required this.status,
@@ -40,6 +42,7 @@ class Maraude {
     int? estimatedPlates,
     String? distributionType,
     String? comment,
+    bool? isWeekly,
     double? latitude,
     double? longitude,
     MaraudeStatus? status,
@@ -63,6 +66,7 @@ class Maraude {
       estimatedPlates: estimatedPlates ?? this.estimatedPlates,
       distributionType: distributionType ?? this.distributionType,
       comment: comment ?? currentComment,
+      isWeekly: isWeekly ?? this.isWeekly,
       latitude: latitude ?? this.latitude,
       longitude: longitude ?? this.longitude,
       status: status ?? this.status,
@@ -85,6 +89,7 @@ class Maraude {
           ? _stringValue(map['distribution_type'])
           : 'Standard',
       comment: _stringValue(map['comment']),
+      isWeekly: _boolValue(map['is_weekly']),
       latitude: _doubleValue(map['latitude']),
       longitude: _doubleValue(map['longitude']),
       status: _statusFromValue(map['status']),
@@ -106,6 +111,7 @@ class Maraude {
       'distribution_type':
           distributionType.trim().isEmpty ? 'Standard' : distributionType,
       'comment': comment,
+      'is_weekly': isWeekly,
       'latitude': latitude,
       'longitude': longitude,
       'status': status.name,
@@ -205,6 +211,15 @@ class Maraude {
     }
 
     return double.tryParse(value?.toString() ?? '') ?? 0;
+  }
+
+  static bool _boolValue(dynamic value) {
+    if (value is bool) {
+      return value;
+    }
+
+    final normalized = value?.toString().trim().toLowerCase() ?? '';
+    return normalized == 'true' || normalized == 't' || normalized == '1';
   }
 
   static MaraudeStatus _statusFromValue(dynamic value) {
