@@ -7,6 +7,33 @@
 
 #include <iostream>
 
+namespace {
+
+bool SetRegistryDefaultValue(HKEY key, const std::wstring& value) {
+  const auto* bytes = reinterpret_cast<const BYTE*>(value.c_str());
+  const DWORD size = static_cast<DWORD>((value.size() + 1) * sizeof(wchar_t));
+  return RegSetValueExW(key, nullptr, 0, REG_SZ, bytes, size) == ERROR_SUCCESS;
+}
+
+bool SetRegistryNamedValue(HKEY key,
+                           const wchar_t* name,
+                           const std::wstring& value) {
+  const auto* bytes = reinterpret_cast<const BYTE*>(value.c_str());
+  const DWORD size = static_cast<DWORD>((value.size() + 1) * sizeof(wchar_t));
+  return RegSetValueExW(key, name, 0, REG_SZ, bytes, size) == ERROR_SUCCESS;
+}
+
+bool CreateRegistryKey(HKEY root,
+                       const std::wstring& path,
+                       HKEY* created_key) {
+  DWORD disposition = 0;
+  return RegCreateKeyExW(root, path.c_str(), 0, nullptr, 0,
+                         KEY_WRITE, nullptr, created_key,
+                         &disposition) == ERROR_SUCCESS;
+}
+
+}  // namespace
+
 void CreateAndAttachConsole() {
   if (::AllocConsole()) {
     FILE *unused;
@@ -62,4 +89,54 @@ std::string Utf8FromUtf16(const wchar_t* utf16_string) {
     return std::string();
   }
   return utf8_string;
+}
+
+bool RegisterUrlSchemeForCurrentUser(const wchar_t* scheme,
+                                     const wchar_t* executable_path) {
+  if (scheme == nullptr || executable_path == nullptr) {
+    return false;
+  }
+
+  const std::wstring scheme_name(scheme);
+  const std::wstring executable(executable_path);
+  if (scheme_name.empty() || executable.empty()) {
+    return false;
+  }
+
+  const std::wstring base_key_path =
+      L"Software\\Classes\\" + scheme_name;
+  const std::wstring command = L'"' + executable + L'"' + L" \"%1\"";
+
+  HKEY base_key = nullptr;
+  if (!CreateRegistryKey(HKEY_CURRENT_USER, base_key_path, &base_key)) {
+    return false;
+  }
+
+  bool success = SetRegistryDefaultValue(
+                     base_key, L"URL:" + scheme_name + L" Protocol") &&
+                 SetRegistryNamedValue(base_key, L"URL Protocol", L"");
+  RegCloseKey(base_key);
+
+  HKEY icon_key = nullptr;
+  if (success &&
+      CreateRegistryKey(HKEY_CURRENT_USER,
+                        base_key_path + L"\\DefaultIcon", &icon_key)) {
+    success = SetRegistryDefaultValue(icon_key, executable + L",0");
+    RegCloseKey(icon_key);
+  } else if (success) {
+    success = false;
+  }
+
+  HKEY command_key = nullptr;
+  if (success &&
+      CreateRegistryKey(HKEY_CURRENT_USER,
+                        base_key_path + L"\\shell\\open\\command",
+                        &command_key)) {
+    success = SetRegistryDefaultValue(command_key, command);
+    RegCloseKey(command_key);
+  } else if (success) {
+    success = false;
+  }
+
+  return success;
 }

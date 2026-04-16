@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../config/theme.dart';
@@ -23,6 +24,7 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _obscurePassword = true;
   bool _isSubmitting = false;
   bool _isRoutingAfterAuth = false;
+  String? _pendingConfirmationEmail;
 
   @override
   void initState() {
@@ -82,6 +84,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
     try {
       await ProfileService.instance.hydrateCurrentSession();
+      _pendingConfirmationEmail = null;
 
       if (!mounted) {
         return;
@@ -180,6 +183,7 @@ class _LoginScreenState extends State<LoginScreen> {
       );
 
       if (response.session != null) {
+        _pendingConfirmationEmail = null;
         await _completeAuthenticatedFlow();
         return;
       }
@@ -188,10 +192,28 @@ class _LoginScreenState extends State<LoginScreen> {
         return;
       }
 
+      setState(() {
+        _pendingConfirmationEmail = draft.email;
+      });
+
+      final confirmed = await _showEmailConfirmationDialog(
+        initialEmail: draft.email,
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      if (confirmed == true) {
+        _pendingConfirmationEmail = null;
+        await _completeAuthenticatedFlow();
+        return;
+      }
+
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
-            'Compte cree. Verifiez maintenant votre email avant de vous connecter.',
+            'Compte cree. Finalisez maintenant l inscription avec le code recu par email.',
           ),
         ),
       );
@@ -222,6 +244,17 @@ class _LoginScreenState extends State<LoginScreen> {
         });
       }
     }
+  }
+
+  Future<bool?> _showEmailConfirmationDialog({
+    String? initialEmail,
+  }) {
+    return showDialog<bool>(
+      context: context,
+      builder: (_) => _EmailConfirmationDialog(
+        initialEmail: initialEmail ?? _emailController.text.trim(),
+      ),
+    );
   }
 
   Future<void> _handleLogin() async {
@@ -409,6 +442,22 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                         ],
                       ),
+                      const SizedBox(height: 8),
+                      GestureDetector(
+                        onTap: () {
+                          _showEmailConfirmationDialog(
+                            initialEmail: _pendingConfirmationEmail,
+                          );
+                        },
+                        child: const Text(
+                          'Valider mon email',
+                          style: TextStyle(
+                            color: AppTheme.textSecondaryColor,
+                            fontSize: 12,
+                            decoration: TextDecoration.underline,
+                          ),
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -435,6 +484,16 @@ class _SignUpDraft {
   final String email;
   final String password;
   final String confirmPassword;
+}
+
+class _EmailOtpDraft {
+  const _EmailOtpDraft({
+    required this.email,
+    required this.token,
+  });
+
+  final String email;
+  final String token;
 }
 
 class _ForgotPasswordDialog extends StatefulWidget {
@@ -510,6 +569,256 @@ class _SignUpDialog extends StatefulWidget {
 
   @override
   State<_SignUpDialog> createState() => _SignUpDialogState();
+}
+
+class _EmailConfirmationDialog extends StatefulWidget {
+  const _EmailConfirmationDialog({
+    required this.initialEmail,
+  });
+
+  final String initialEmail;
+
+  @override
+  State<_EmailConfirmationDialog> createState() =>
+      _EmailConfirmationDialogState();
+}
+
+class _EmailConfirmationDialogState extends State<_EmailConfirmationDialog> {
+  late final TextEditingController _emailController;
+  late final TextEditingController _tokenController;
+  bool _isSubmitting = false;
+  bool _isResending = false;
+  String? _emailError;
+  String? _tokenError;
+  String? _helperMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    _emailController = TextEditingController(text: widget.initialEmail);
+    _tokenController = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _tokenController.dispose();
+    super.dispose();
+  }
+
+  bool _validate() {
+    final email = _emailController.text.trim();
+    final token = _tokenController.text.trim();
+
+    final emailError = email.isEmpty
+        ? 'Renseignez votre email.'
+        : (!email.contains('@') ? 'Renseignez un email valide.' : null);
+    final tokenError = token.isEmpty
+        ? 'Renseignez le code recu par email.'
+      : (!RegExp(r'^\d+4').hasMatch(token)
+        ? 'Le code doit contenir uniquement des chiffres.'
+            : null);
+
+    setState(() {
+      _emailError = emailError;
+      _tokenError = tokenError;
+      _helperMessage = null;
+    });
+
+    return emailError == null && tokenError == null;
+  }
+
+  Future<void> _submit() async {
+    FocusScope.of(context).unfocus();
+    if (!_validate() || _isSubmitting) {
+      return;
+    }
+
+    setState(() {
+      _isSubmitting = true;
+      _helperMessage = null;
+    });
+
+    try {
+      await AuthService.instance.verifySignUpOtp(
+        email: _emailController.text.trim(),
+        token: _tokenController.text.trim(),
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      Navigator.of(context).pop(true);
+    } on AuthException catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _helperMessage = error.message;
+      });
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _helperMessage = 'Validation impossible pour le moment.';
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSubmitting = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _resend() async {
+    FocusScope.of(context).unfocus();
+    final email = _emailController.text.trim();
+    final emailError = email.isEmpty
+        ? 'Renseignez votre email.'
+        : (!email.contains('@') ? 'Renseignez un email valide.' : null);
+
+    if (emailError != null || _isResending) {
+      setState(() {
+        _emailError = emailError;
+      });
+      return;
+    }
+
+    setState(() {
+      _isResending = true;
+      _helperMessage = null;
+    });
+
+    try {
+      await AuthService.instance.resendSignUpOtp(email);
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _helperMessage =
+            'Un nouvel email de confirmation vient d etre envoye.';
+      });
+    } on AuthException catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _helperMessage = error.message;
+      });
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _helperMessage = 'Renvoi impossible pour le moment.';
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isResending = false;
+        });
+      }
+    }
+  }
+
+  void _close() {
+    FocusScope.of(context).unfocus();
+    Navigator.of(context).pop(false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Valider mon email'),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'Ouvrez l email sur n importe quel appareil puis saisissez ici le code numerique recu.',
+              style: TextStyle(
+                color: AppTheme.textSecondaryColor,
+                height: 1.4,
+              ),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _emailController,
+              keyboardType: TextInputType.emailAddress,
+              decoration: InputDecoration(
+                hintText: 'Email',
+                errorText: _emailError,
+              ),
+              autofocus: true,
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _tokenController,
+              keyboardType: TextInputType.number,
+              inputFormatters: [
+                FilteringTextInputFormatter.digitsOnly,
+              ],
+              decoration: InputDecoration(
+                hintText: 'Code de confirmation',
+                errorText: _tokenError,
+              ),
+            ),
+            if (_helperMessage != null) ...[
+              const SizedBox(height: 12),
+              Text(
+                _helperMessage!,
+                style: TextStyle(
+                  color: _helperMessage!.startsWith('Un nouvel email')
+                      ? AppTheme.successColor
+                      : AppTheme.dangerColor,
+                  fontSize: 13,
+                  height: 1.4,
+                ),
+              ),
+            ],
+            const SizedBox(height: 20),
+            ElevatedButton(
+              onPressed: _isSubmitting ? null : _submit,
+              child: _isSubmitting
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          Colors.white,
+                        ),
+                      ),
+                    )
+                  : const Text('Valider le code'),
+            ),
+            const SizedBox(height: 8),
+            TextButton(
+              onPressed: _isResending ? null : _resend,
+              child: Text(
+                _isResending ? 'Renvoi...' : 'Renvoyer le code',
+              ),
+            ),
+            Center(
+              child: TextButton(
+                onPressed: _close,
+                child: const Text('Plus tard'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class _SignUpDialogState extends State<_SignUpDialog> {

@@ -160,13 +160,29 @@ void main() {
   );
 
   testWidgets(
+    'valider mon email reste accessible sous l inscription',
+    (WidgetTester tester) async {
+      await pumpScreen(tester, const LoginScreen());
+
+      expect(find.text('Valider mon email'), findsOneWidget);
+
+      await tester.tap(find.text('Valider mon email'));
+      await finishTransition(tester);
+
+      expect(find.byType(AlertDialog), findsOneWidget);
+      expect(find.text('Code de confirmation'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
     'le profil peut etre modifie en mode local',
     (WidgetTester tester) async {
       CurrentSession.resetToDemo();
 
       await pumpScreen(tester, const ProfileScreen());
 
-      await tester.tap(find.widgetWithText(OutlinedButton, 'Modifier'));
+      await tester.tap(find.byIcon(Icons.edit_outlined));
       await finishTransition(tester);
 
       final dialogFields = find.descendant(
@@ -186,6 +202,39 @@ void main() {
       expect(find.text('Alice Martin'), findsOneWidget);
       expect(find.text('alice@example.com'), findsOneWidget);
       expect(find.text('Association Solidaire'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'un email de profil invalide garde le dialogue ouvert',
+    (WidgetTester tester) async {
+      CurrentSession.resetToDemo();
+
+      await pumpScreen(tester, const ProfileScreen());
+
+      await tester.tap(find.byIcon(Icons.edit_outlined));
+      await finishTransition(tester);
+
+      final dialogFields = find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.byType(TextField),
+      );
+
+      await tester.enterText(dialogFields.at(0), 'Alice Martin');
+      await tester.enterText(dialogFields.at(1), 'alice-at-example.com');
+      await tester.enterText(dialogFields.at(2), 'Association Solidaire');
+      await tester.tap(find.widgetWithText(ElevatedButton, 'Enregistrer'));
+      await finishTransition(tester);
+
+      expect(find.byType(AlertDialog), findsOneWidget);
+      expect(find.text('Renseignez un email valide.'), findsOneWidget);
+
+      final fields = tester.widgetList<TextField>(dialogFields).toList();
+      expect(fields[0].controller?.text, 'Alice Martin');
+      expect(fields[1].controller?.text, 'alice-at-example.com');
+      expect(fields[2].controller?.text, 'Association Solidaire');
+      expect(find.byType(SnackBar), findsNothing);
       expect(tester.takeException(), isNull);
     },
   );

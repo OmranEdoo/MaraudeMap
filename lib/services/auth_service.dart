@@ -46,7 +46,6 @@ class AuthService {
     return _client.auth.signUp(
       email: email,
       password: password,
-      emailRedirectTo: SupabaseConfig.emailRedirectTo,
       data: {
         'full_name': fullName,
         'association_name': associationName,
@@ -64,6 +63,36 @@ class AuthService {
     await _client.auth.resetPasswordForEmail(
       email,
       redirectTo: SupabaseConfig.emailRedirectTo,
+    );
+  }
+
+  Future<AuthResponse> verifySignUpOtp({
+    required String email,
+    required String token,
+  }) async {
+    if (!isConfigured) {
+      throw AuthException(
+        'Supabase n\'est pas encore configure pour cette application.',
+      );
+    }
+
+    return _client.auth.verifyOTP(
+      email: email,
+      token: token,
+      type: OtpType.signup,
+    );
+  }
+
+  Future<void> resendSignUpOtp(String email) async {
+    if (!isConfigured) {
+      throw AuthException(
+        'Supabase n\'est pas encore configure pour cette application.',
+      );
+    }
+
+    await _client.auth.resend(
+      email: email,
+      type: OtpType.signup,
     );
   }
 

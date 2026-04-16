@@ -37,15 +37,25 @@ values (
 
 ## 4. Lancer l'application avec les cles
 
-Avant le premier test d'inscription par email, configure aussi le redirect d'authentification dans Supabase :
+Avant le premier test d'inscription par email, verifie aussi la configuration d'authentification dans Supabase :
 
 1. Ouvre `Authentication > URL Configuration`.
-2. Remplace `Site URL` par `maraudemap://login-callback/` au lieu de `http://localhost:3000`.
-3. Ajoute aussi `maraudemap://login-callback/` dans `Additional Redirect URLs`.
-4. Ouvre `Authentication > Email Templates` et verifie que les templates de confirmation / recovery utilisent bien `{{ .ConfirmationURL }}`. Si un template personnalise utilise `{{ .SiteURL }}`, `localhost:3000` peut continuer d'apparaitre dans les emails.
-5. Si tu avais deja envoye un email d'inscription avant ce reglage, renvoie un nouvel email : les anciens liens qui pointent vers `localhost:3000` ou qui ont expire continueront d'echouer.
+2. Pour les liens de reinitialisation de mot de passe, garde `maraudemap://login-callback/` comme `Site URL` a la place de `http://localhost:3000`.
+3. Ajoute aussi `maraudemap://login-callback/` dans `Additional Redirect URLs` pour la reinitialisation.
+4. Ouvre `Authentication > Email Templates`.
+5. Dans le template `Confirm signup`, n'utilise plus `{{ .ConfirmationURL }}`. Garde uniquement `{{ .Token }}` pour confirmer l'inscription par code dans l'application.
+6. Dans le template `Reset password`, verifie que le lien utilise bien `{{ .ConfirmationURL }}`.
+7. Si un template personnalise utilise `{{ .SiteURL }}`, `localhost:3000` peut continuer d'apparaitre dans les emails.
+8. Si tu avais deja envoye un email d'inscription avant ce reglage, renvoie un nouvel email : les anciens messages peuvent encore contenir un lien obsolete au lieu du code attendu.
 
 Apres une modification du deep link mobile, fais un vrai redemarrage de l'application (`flutter run` ou reinstallation) plutot qu'un simple hot reload.
+
+Notes utiles :
+
+- Lors d'une inscription avec confirmation email, Supabase cree bien l'utilisateur dans `auth.users` avant le clic sur le lien. Tant que l'email n'est pas confirme, le compte reste non confirme et ne doit pas etre considere comme actif.
+- Pour que le lien de reinitialisation fonctionne aussi sur Windows, lance l'application Windows au moins une fois. Le premier lancement enregistre le protocole `maraudemap://` pour l'utilisateur courant.
+- L'application ne s'appuie plus sur le lien de confirmation d'inscription : apres l'inscription, l'utilisateur doit saisir le code `{{ .Token }}` recu par email.
+- L'action `Valider mon email` reste visible sur l'ecran de connexion, juste sous la zone `Pas encore de compte ?`, avec un style discret. Apres une inscription, l'email saisi est pre-rempli dans cette fenetre.
 
 Utilise des `dart-define` :
 

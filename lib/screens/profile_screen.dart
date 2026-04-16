@@ -281,22 +281,27 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                             ),
                                           ),
                                           const SizedBox(width: 12),
-                                          OutlinedButton.icon(
-                                            onPressed:
-                                                _isSavingProfile ? null : _showEditProfileDialog,
-                                            icon: _isSavingProfile
-                                                ? const SizedBox(
-                                                    width: 16,
-                                                    height: 16,
-                                                    child: CircularProgressIndicator(
-                                                      strokeWidth: 2,
+                                          SizedBox(
+                                            width: 44,
+                                            height: 44,
+                                            child: OutlinedButton(
+                                              onPressed: _isSavingProfile
+                                                  ? null
+                                                  : _showEditProfileDialog,
+                                              style: OutlinedButton.styleFrom(
+                                                padding: EdgeInsets.zero,
+                                              ),
+                                              child: _isSavingProfile
+                                                  ? const SizedBox(
+                                                      width: 16,
+                                                      height: 16,
+                                                      child: CircularProgressIndicator(
+                                                        strokeWidth: 2,
+                                                      ),
+                                                    )
+                                                  : const Icon(
+                                                      Icons.edit_outlined,
                                                     ),
-                                                  )
-                                                : const Icon(Icons.edit_outlined),
-                                            label: Text(
-                                              _isSavingProfile
-                                                  ? 'Enregistrement'
-                                                  : 'Modifier',
                                             ),
                                           ),
                                         ],
@@ -395,6 +400,9 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
   late final TextEditingController _fullNameController;
   late final TextEditingController _emailController;
   late final TextEditingController _associationController;
+  String? _fullNameError;
+  String? _emailError;
+  String? _associationError;
 
   @override
   void initState() {
@@ -419,6 +427,66 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
     Navigator.of(context).pop(draft);
   }
 
+  OutlineInputBorder _errorBorder({double width = 1.5}) {
+    return OutlineInputBorder(
+      borderRadius: BorderRadius.circular(8),
+      borderSide: BorderSide(
+        color: AppTheme.dangerColor,
+        width: width,
+      ),
+    );
+  }
+
+  bool _validateForm() {
+    final fullName = _fullNameController.text.trim();
+    final email = _emailController.text.trim();
+    final associationName = _associationController.text.trim();
+
+    final fullNameError =
+        fullName.isEmpty ? 'Renseignez votre nom complet.' : null;
+    final emailError = email.isEmpty
+        ? 'Renseignez votre email.'
+        : (!email.contains('@') ? 'Renseignez un email valide.' : null);
+    final associationError =
+        associationName.isEmpty ? 'Renseignez votre association.' : null;
+
+    setState(() {
+      _fullNameError = fullNameError;
+      _emailError = emailError;
+      _associationError = associationError;
+    });
+
+    return fullNameError == null &&
+        emailError == null &&
+        associationError == null;
+  }
+
+  void _revalidateIfNeeded() {
+    if (_fullNameError == null &&
+        _emailError == null &&
+        _associationError == null) {
+      return;
+    }
+
+    _validateForm();
+  }
+
+  void _submit() {
+    FocusScope.of(context).unfocus();
+
+    if (!_validateForm()) {
+      return;
+    }
+
+    _close(
+      _ProfileDraft(
+        fullName: _fullNameController.text.trim(),
+        email: _emailController.text.trim(),
+        associationName: _associationController.text.trim(),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
@@ -429,8 +497,10 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
           children: [
             TextField(
               controller: _fullNameController,
-              decoration: const InputDecoration(
+              onChanged: (_) => _revalidateIfNeeded(),
+              decoration: InputDecoration(
                 hintText: 'Nom complet',
+                errorText: _fullNameError,
               ),
               autofocus: true,
             ),
@@ -438,15 +508,21 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
             TextField(
               controller: _emailController,
               keyboardType: TextInputType.emailAddress,
-              decoration: const InputDecoration(
+              onChanged: (_) => _revalidateIfNeeded(),
+              decoration: InputDecoration(
                 hintText: 'Email',
+                errorText: _emailError,
+                errorBorder: _errorBorder(),
+                focusedErrorBorder: _errorBorder(width: 2),
               ),
             ),
             const SizedBox(height: 12),
             TextField(
               controller: _associationController,
-              decoration: const InputDecoration(
+              onChanged: (_) => _revalidateIfNeeded(),
+              decoration: InputDecoration(
                 hintText: 'Association',
+                errorText: _associationError,
               ),
             ),
           ],
@@ -458,13 +534,7 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
           child: const Text('Annuler'),
         ),
         ElevatedButton(
-          onPressed: () => _close(
-            _ProfileDraft(
-              fullName: _fullNameController.text.trim(),
-              email: _emailController.text.trim(),
-              associationName: _associationController.text.trim(),
-            ),
-          ),
+          onPressed: _submit,
           child: const Text('Enregistrer'),
         ),
       ],
